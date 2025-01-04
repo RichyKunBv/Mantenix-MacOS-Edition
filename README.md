@@ -1,7 +1,7 @@
 # macOS_Maintenance
 Maintenance for macOS
 
-para usarlo tiene que ingresar a la Terminal y escribir "sudo"
+Para usarlo tiene que ingresar a la Terminal y escribir "sudo"
 un ejemplo es "sudo /Users/(tu usuario)/Desktop/macos_mantenimiento.sh"
 
 
