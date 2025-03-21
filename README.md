@@ -1,32 +1,43 @@
 # macOS_Maintenance
-Maintenance for macOS
+# Mantenimiento para macOS
 
-Para usarlo tiene que ingresar a la Terminal y escribir "sudo"
-un ejemplo es "sudo /Users/(tu usuario)/Desktop/macos_mantenimiento.sh"
-Funciones del Script:
-	
- 1.	Verificar y reparar el disco principal.
+Este script permite realizar diversas tareas de mantenimiento en macOS, como la verificación y reparación del disco, limpieza de cachés, restablecimiento de la red y más.
 
- 2.	Reparar permisos del sistema (solo en macOS 10.14 y versiones anteriores).
-	
- 3.	Limpiar cachés y registros accesibles.
-	
- 4.	Restablecer configuraciones de red (DNS, IPv6, interfaz).
-	
- 5.	Instrucción para ejecutar fsck en modo de recuperación.
-	
+## Uso
 
+Para ejecutar el script, abre la Terminal y escribe el siguiente comando:
 
-To use it you have to enter the Terminal and type "sudo"
-an example is "sudo /Users/(your user)/Desktop/macos_maintenance.sh"
-Script Functions:
+```sh
+sudo /Users/(tu_usuario)/Desktop/macos_mantenimiento.sh
+```
 
-1. Check and repair the main disk.
+Donde `(tu_usuario)` es el nombre de usuario en tu Mac.
 
-2. Repair system permissions (macOS 10.14 and earlier only).
+## Funciones del Script
 
-3. Clean accessible caches and logs.
+- **Verificar y reparar el disco principal** (compatible con APFS y HFS+).
+- **Reparar permisos del sistema** (solo en macOS Mojave 10.14 y versiones anteriores).
+- **Limpiar cachés del sistema y del usuario**, incluyendo registros de logs.
+- **Eliminar metadatos y cachés de iconos y Spotlight**.
+- **Restablecer configuraciones de red** (DNS, IPv6, interfaz de red).
+- **Liberar memoria RAM y eliminar archivos de intercambio (swap)**.
+- **Detener procesos de indexación** temporalmente para mejorar el rendimiento.
+- **Instrucciones para ejecutar fsck en modo de recuperación**.
 
-4. Reset network settings (DNS, IPv6, interface).
+## Compatibilidad
 
-5. Instruction to run fsck in recovery mode.
+Este script es compatible con macOS desde High Sierra (10.13) hasta las versiones más recientes (Sonoma/Sequoia 14.0/15.0).
+
+## Notas
+
+- Se requiere ejecutar el script con permisos de administrador (`sudo`).
+- Algunas funciones, como la reparación de permisos, solo están disponibles en versiones antiguas de macOS.
+- Para una reparación avanzada del sistema de archivos, es necesario reiniciar en modo de recuperación y ejecutar el comando:
+  
+  ```sh
+  /sbin/fsck -fy
+  ```
+
+---
+
+Con este script, puedes mantener tu macOS limpio y en buen estado de funcionamiento de forma rápida y sencilla.
