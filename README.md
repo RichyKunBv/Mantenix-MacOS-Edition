@@ -5,6 +5,12 @@ Este script permite realizar diversas tareas de mantenimiento en macOS, como la 
 
 ## Uso
 
+Para que se pueda usar este script en la terminal escribe: 
+
+```sh
+chmod +x /Users/(tu_usuario)/Desktop/macos_mantenimiento.sh
+```
+
 Para ejecutar el script, abre la Terminal y escribe el siguiente comando:
 
 ```sh
@@ -40,4 +46,4 @@ Este script es compatible con macOS desde High Sierra (10.13) hasta las versione
 
 ---
 
-Con este script, puedes mantener tu macOS limpio y en buen estado de funcionamiento de forma rápida y sencilla.
+*TE RECOMIENDO COPIAR Y PEGAR EL SCRIPT AL ESCRITORIO, Y EN LOS COMANDOS QUE SE NECESITA PONER "/Users/(tu_usuario)/Desktop/macos_mantenimiento.sh" ES MAS FACIL Y RAPIDO SELECCIONAR EL ARCHIVO Y ARRASTRARLO A LA TERMINAL*
