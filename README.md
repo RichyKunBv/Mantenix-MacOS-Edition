@@ -1,5 +1,3 @@
-¡Por supuesto! Aquí tienes el `README.md` listo para copiar y pegar, con el formato adecuado y la información actualizada para tu script v2.0:
-
 # macOS_Maintenance
 
 ---
