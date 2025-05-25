@@ -1,49 +1,79 @@
-# macOS_Maintenance
-# Mantenimiento para macOS
+¡Por supuesto! Aquí tienes el `README.md` listo para copiar y pegar, con el formato adecuado y la información actualizada para tu script v2.0:
 
-Este script permite realizar diversas tareas de mantenimiento en macOS, como la verificación y reparación del disco, limpieza de cachés, restablecimiento de la red y más.
+# macOS_Maintenance
+
+---
+
+## Mantenimiento para macOS
+
+Este script proporciona un **menú interactivo** que te permite realizar diversas tareas de mantenimiento en macOS. Incluye funciones para la **limpieza del sistema**, el **mantenimiento de componentes clave** y la **actualización de Homebrew**. Está diseñado para ser fácil de usar y es compatible con varias versiones de macOS.
+
+---
 
 ## Uso
 
-Para que se pueda usar este script en la terminal escribe: 
+Para empezar a usar el script, primero dale permisos de ejecución. Abre la Terminal y ejecuta el siguiente comando (recuerda cambiar `(tu_usuario)` por tu nombre de usuario y ajusta la ruta si el script no está en tu Escritorio):
 
 ```sh
 chmod +x /Users/(tu_usuario)/Desktop/macos_mantenimiento.sh
 ```
 
-Para ejecutar el script, abre la Terminal y escribe el siguiente comando:
+Una vez que tenga los permisos, puedes ejecutar el script. Abre la Terminal y usa este comando:
 
 ```sh
 sudo /Users/(tu_usuario)/Desktop/macos_mantenimiento.sh
 ```
 
-Donde `(tu_usuario)` es el nombre de usuario en tu Mac.
-
-## Funciones del Script
-
-- **Verificar y reparar el disco principal** (compatible con APFS y HFS+).
-- **Reparar permisos del sistema** (solo en macOS Mojave 10.14 y versiones anteriores).
-- **Limpiar cachés del sistema y del usuario**, incluyendo registros de logs.
-- **Eliminar metadatos y cachés de iconos y Spotlight**.
-- **Restablecer configuraciones de red** (DNS, IPv6, interfaz de red).
-- **Liberar memoria RAM y eliminar archivos de intercambio (swap)**.
-- **Detener procesos de indexación** temporalmente para mejorar el rendimiento.
-- **Instrucciones para ejecutar fsck en modo de recuperación**.
-
-## Compatibilidad
-
-Este script es compatible con macOS desde High Sierra (10.13) hasta las versiones más recientes (Sonoma/Sequoia 14.0/15.0).
-
-## Notas
-
-- Se requiere ejecutar el script con permisos de administrador (`sudo`).
-- Algunas funciones, como la reparación de permisos, solo están disponibles en versiones antiguas de macOS.
-- Para una reparación avanzada del sistema de archivos, es necesario reiniciar en modo de recuperación y ejecutar el comando:
-  
-  ```sh
-  /sbin/fsck -fy
-  ```
+**Consejo rápido:** Para ejecutar el script de forma más sencilla, escribe `sudo ` (con el espacio al final) en la Terminal, luego simplemente **arrastra el archivo `macos_mantenimiento.sh` desde el Finder a la ventana de la Terminal** y presiona `Enter`.
 
 ---
 
-*TE RECOMIENDO COPIAR Y PEGAR EL SCRIPT AL ESCRITORIO, Y EN LOS COMANDOS QUE SE NECESITA PONER "/Users/(tu_usuario)/Desktop/macos_mantenimiento.sh" ES MAS FACIL Y RAPIDO SELECCIONAR EL ARCHIVO Y ARRASTRARLO A LA TERMINAL*
+## Funciones del Script (v2.0)
+
+La versión 2.0 de tu script ofrece un menú organizado con las siguientes opciones:
+
+### 1. Limpieza General
+Esta opción ejecuta varias tareas para **liberar espacio y optimizar el rendimiento**:
+* **Limpieza de cachés de sistema, usuario, logs** y estados de aplicaciones guardados.
+* **Eliminación de metadatos y cachés de iconos y Spotlight**.
+* **Limpieza de archivos de intercambio (Swap)** (te pedirá confirmación antes de proceder).
+
+### 2. Mantenimiento del Sistema
+Aquí encontrarás funciones esenciales para el **buen funcionamiento de los componentes centrales** de tu macOS:
+* **Verificación y reparación del disco principal** (compatible con sistemas de archivos APFS y HFS+).
+* **Reparación de permisos del sistema** (solo relevante para macOS Mojave 10.14 y versiones anteriores).
+* **Restablecimiento de configuraciones de red** (limpia DNS, ajusta IPv6 y reinicia la interfaz de red).
+* **Liberación de memoria RAM**.
+* **Detención temporal de procesos de indexación** (`mds`, `mdworker`, `corespotlightd`) para mejorar la respuesta del sistema.
+
+### 3. Actualizar Homebrew
+Esta opción te permite **mantener Homebrew y tus paquetes actualizados**:
+* Detecta si Homebrew está instalado en tu sistema.
+* Si lo tienes, **actualiza Homebrew y todos los paquetes instalados** a través de él, además de limpiar archivos antiguos.
+* Si Homebrew no está presente, te informará y te indicará dónde encontrarlo para instalarlo.
+    * **Nota Importante:** Esta tarea se ejecuta con los permisos del **usuario que inició el script** (no con `sudo`), lo cual es crucial para evitar problemas de permisos con tu instalación de Homebrew.
+
+### Opciones Adicionales del Menú:
+* **A. Ejecutar TODO el Mantenimiento:** Realiza de forma consecutiva todas las tareas incluidas en "Limpieza General", "Mantenimiento del Sistema" y "Actualizar Homebrew".
+* **P. Próximamente (Ver el Repositorio):** Muestra información sobre futuras actualizaciones del script y te dirige al repositorio del proyecto.
+* **Q. Salir:** Termina la ejecución del script.
+
+---
+
+## Compatibilidad
+
+Este script ha sido diseñado para ser compatible con **macOS High Sierra (10.13)** y versiones posteriores, incluyendo las más recientes como **Sonoma (14.x)** y **Sequoia (15.0)**.
+
+---
+
+## Notas Importantes
+
+* Es **obligatorio ejecutar el script con permisos de administrador (`sudo`)** para que la mayoría de sus funciones puedan operar correctamente.
+* Algunas funciones, como la **reparación de permisos**, solo son útiles y están disponibles en versiones de macOS más antiguas (Mojave y anteriores).
+* Para una **reparación más profunda del sistema de archivos**, te recomendamos reiniciar tu Mac en **modo de recuperación** (manteniendo `Command + R` al encender) y luego ejecutar el siguiente comando en la Terminal de recuperación:
+    ```sh
+    /sbin/fsck -fy
+    ```
+
+---
+```
