@@ -1,5 +1,5 @@
 #!/bin/bash
-# Mantenimiento macOS v2.0.0
+# Mantenimiento macOS v2.0.1
 
 # Colores para la interfaz
 GREEN='\033[0;32m'
