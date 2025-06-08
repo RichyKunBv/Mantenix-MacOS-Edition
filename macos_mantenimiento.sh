@@ -18,7 +18,7 @@ check_sudo() {
     fi
 }
 
-# Funciones
+# Identificar versión de macOS
 get_macos_version() {
     sw_vers -productVersion | cut -d '.' -f 2
 }
@@ -140,7 +140,7 @@ group_clean_all() {
     echo -e "${BLUE}--- Ejecutando todas las tareas de limpieza ---${NC}"
     clean_caches_and_temp
     clean_icons_and_spotlight
-    clean_swap_files 
+    clean_swap_files # Esta función pide confirmación
     echo -e "${GREEN}Todas las tareas de limpieza completadas.${NC}"
     sleep 2
 }
@@ -158,40 +158,63 @@ group_system_maintenance() {
 }
 
 update_homebrew() {
-    echo -e "${YELLOW}--- Actualizando Homebrew ---${NC}"
-    if command -v brew &>/dev/null; then
-        echo -e "${BLUE}Homebrew está instalado.${NC}"
-        ORIGINAL_USER="${SUDO_USER}"
-
-        if [ -z "$ORIGINAL_USER" ]; then
-            echo -e "${RED}No se pudo determinar el usuario original (SUDO_USER no establecido).${NC}"
-            echo -e "${RED}Esto ocurre si el script se ejecuta directamente como root o si sudo no pasó la variable.${NC}"
-            echo -e "${RED}Saltando la actualización de Homebrew para evitar problemas de permisos.${NC}"
-            sleep 4
-            return
+    echo -e "${YELLOW}--- Actualización de Homebrew ---${NC}"
+    
+    # Verificar si Homebrew está instalado usando rutas conocidas
+    BREW_PATHS=("/usr/local/bin/brew" "/opt/homebrew/bin/brew" "$HOME/.linuxbrew/bin/brew")
+    BREW_FOUND=0
+    
+    for path in "${BREW_PATHS[@]}"; do
+        if [[ -x "$path" ]]; then
+            brew="$path"
+            BREW_FOUND=1
+            break
         fi
-
-        echo -e "${BLUE}Ejecutando actualización de Homebrew como el usuario '${ORIGINAL_USER}'...${NC}"
-        su - "$ORIGINAL_USER" -c "brew update && brew upgrade --all && brew cleanup"
-
-        if [ $? -eq 0 ]; then 
-            echo -e "${GREEN}Homebrew y todos los paquetes actualizados y limpiados correctamente.${NC}"
-        else
-            echo -e "${RED}Hubo un error durante la actualización de Homebrew.${NC}"
-            echo -e "${RED}Asegúrate de que el usuario '${ORIGINAL_USER}' tiene los permisos correctos para su instalación de Homebrew.${NC}"
-        fi
-    else
-        echo -e "${YELLOW}Homebrew no está instalado en tu sistema. Puedes instalarlo visitando: https://brew.sh/${NC}"
+    done
+    
+    if [[ $BREW_FOUND -eq 0 ]] && ! command -v brew &>/dev/null; then
+        echo -e "${RED}❌ Homebrew no está instalado.${NC}"
+        echo -e "${YELLOW}Para instalarlo, ejecuta este comando en tu terminal:${NC}"
+        echo -e "${BLUE}/bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"${NC}"
+        sleep 3
+        return
     fi
+
+    # Obtener usuario original (no root)
+    ORIGINAL_USER="${SUDO_USER:-$(logname 2>/dev/null || echo "$USER")}"
+    
+    if [[ -z "$ORIGINAL_USER" || "$ORIGINAL_USER" == "root" ]]; then
+        echo -e "${RED}❌ Error: No se pudo obtener el usuario no-root.${NC}"
+        echo -e "${YELLOW}Ejecuta el script sin 'sudo' para actualizar Homebrew.${NC}"
+        sleep 3
+        return
+    fi
+
+    echo -e "${BLUE}🔄 Actualizando Homebrew como usuario '$ORIGINAL_USER'...${NC}"
+    
+    # Comandos para actualizar
+    sudo -u "$ORIGINAL_USER" bash <<'BREW_UPDATE'
+        # Cargar entorno del usuario
+        [[ -f ~/.bash_profile ]] && source ~/.bash_profile
+        [[ -f ~/.zshrc ]] && source ~/.zshrc
+        
+        # Actualizar todo
+        brew update
+        brew upgrade
+        brew upgrade --cask
+        brew cleanup
+        brew doctor
+BREW_UPDATE
+
+    echo -e "${GREEN}✅ Homebrew y todos los paquetes actualizados correctamente.${NC}"
     sleep 3
 }
 
 run_all_maintenance() {
     echo -e "${BLUE}--- Ejecutando TODAS las tareas de Mantenimiento ---${NC}"
-    group_clean_all 
-    
+    group_clean_all # Contiene la confirmación de swap
     group_system_maintenance
-    update_homebrew 
+    update_homebrew # Se ejecuta sin detección previa para esta opción
     echo -e "${GREEN}Todas las tareas de mantenimiento y actualización completadas.${NC}"
     echo -e "${YELLOW}Se recomienda reiniciar el sistema para aplicar todos los cambios.${NC}"
     sleep 3
@@ -220,11 +243,12 @@ show_menu() {
         3) update_homebrew ;;
         A|a) run_all_maintenance ;;
         Y|y)
-            echo -e "${YELLOW}¡Próximamente más funciones! Visita nuestro repositorio para estar al tanto:${NC}"
+            echo -e "${YELLOW}¡Próximamente más funciones! Visita mi repositorio para estar al tanto:${NC}"
             echo -e "${BLUE}${REPO_URL}${NC}"
+            # Abre el navegador si es posible
             if command -v open &>/dev/null; then
                 open "$REPO_URL"
-            elif command -v xdg-open &>/dev/null; then 
+            elif command -v xdg-open &>/dev/null; then
                 xdg-open "$REPO_URL"
             fi
             sleep 5
@@ -234,6 +258,7 @@ show_menu() {
     esac
 }
 
+# --- Bucle Principal del Script ---
 check_sudo
 while true; do
     show_menu
