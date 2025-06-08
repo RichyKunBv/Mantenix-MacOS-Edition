@@ -24,6 +24,10 @@ sudo /Users/(tu_usuario)/Desktop/macos_mantenimiento.sh
 
 **Consejo rápido:** Para ejecutar el script de forma más sencilla, escribe `sudo ` (con el espacio al final) en la Terminal, luego simplemente **arrastra el archivo `macos_mantenimiento.sh` desde el Finder a la ventana de la Terminal** y presiona `Enter`.
 
+
+Ejemplo:
+![Captura de Pantalla 2025-06-07 a la(s) 11 17 32 p m](https://github.com/user-attachments/assets/6048be04-e1fa-41cb-af15-709319994834)
+
 ---
 
 ## Funciones del Script (v2.0)
@@ -55,6 +59,9 @@ Esta opción te permite **mantener Homebrew y tus paquetes actualizados**:
 * **A. Ejecutar TODO el Mantenimiento:** Realiza de forma consecutiva todas las tareas incluidas en "Limpieza General", "Mantenimiento del Sistema" y "Actualizar Homebrew".
 * **P. Próximamente (Ver el Repositorio):** Muestra información sobre futuras actualizaciones del script y te dirige al repositorio del proyecto.
 * **Q. Salir:** Termina la ejecución del script.
+
+![Captura de Pantalla 2025-06-07 a la(s) 11 18 01 p m](https://github.com/user-attachments/assets/de2fe36e-8883-4572-b491-63ba793560fc)
+
 
 ---
 
