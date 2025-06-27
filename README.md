@@ -30,9 +30,12 @@ Ejemplo:
 
 ---
 
-## Funciones del Script (v2.0)
+## Funciones del Script (v2.1)
 
-La versión 2.0 de tu script ofrece un menú organizado con las siguientes opciones:
+La versión 2.1 del script ofrece un menú organizado con las siguientes opciones:
+
+![Captura de Pantalla 2025-06-26 a la(s) 11 36 51 p m](https://github.com/user-attachments/assets/3e7b2691-aca7-4fd1-ba50-c5f3c663fe97)
+
 
 ### 1. Limpieza General
 Esta opción ejecuta varias tareas para **liberar espacio y optimizar el rendimiento**:
@@ -55,12 +58,13 @@ Esta opción te permite **mantener Homebrew y tus paquetes actualizados**:
 * Si Homebrew no está presente, te informará y te indicará dónde encontrarlo para instalarlo.
     * **Nota Importante:** Esta tarea se ejecuta con los permisos del **usuario que inició el script** (no con `sudo`), lo cual es crucial para evitar problemas de permisos con tu instalación de Homebrew.
 
-### Opciones Adicionales del Menú:
+### 4. Ejecutar todo
 * **A. Ejecutar TODO el Mantenimiento:** Realiza de forma consecutiva todas las tareas incluidas en "Limpieza General", "Mantenimiento del Sistema" y "Actualizar Homebrew".
-* **P. Próximamente (Ver el Repositorio):** Muestra información sobre futuras actualizaciones del script y te dirige al repositorio del proyecto.
-* **Q. Salir:** Termina la ejecución del script.
 
-![Captura de Pantalla 2025-06-07 a la(s) 11 18 01 p m](https://github.com/user-attachments/assets/de2fe36e-8883-4572-b491-63ba793560fc)
+### Opciones Adicionales del Menú:
+* **Y. El script se autoactualiza con solo un simple click solo le tienes que picar una vez para que se actualice y reinicie en la ultima version disponible.
+
+![Captura de Pantalla 2025-06-27 a la(s) 12 14 25 a m](https://github.com/user-attachments/assets/94fe0b92-ec5a-4834-860a-d373a9a2e06d)
 
 
 ---
