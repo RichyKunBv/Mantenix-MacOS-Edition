@@ -1,20 +1,47 @@
 #!/bin/bash
-# Mantenimiento macOS v2.0.1
+# Mantenimiento macOS
+CURRENT_VERSION="2.1.2"
 
-# Colores para la interfaz
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
+# --- URLs del Repositorio ---
+REPO_URL="https://github.com/RichyKunBv/macOS_Maintenance"
+RAW_REPO_URL="https://raw.githubusercontent.com/RichyKunBv/macOS_Maintenance/main"
+
+# --- Colores y Estilos ---
+GREEN='\033[1;32m'
+RED='\033[1;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[1;34m'
+CYAN='\033[1;36m'
 NC='\033[0m' # No Color
 
-REPO_URL="https://github.com/RichyKunBv/macOS_Maintenance"
+# --- Funciones de Utilidad ---
 
-# Solicitar permisos de administrador
+# Indicador de actividad (spinner)
+spinner() {
+    local pid=$1
+    local delay=0.1
+    local spinstr='|/-\'
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf " [%c]  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\r"
+    done
+    printf "    \r"
+}
+
+# Pausa interactiva
+press_any_key() {
+    echo -e "\n${YELLOW}Pulsa cualquier tecla para volver al menú...${NC}"
+    read -n 1 -s -r
+}
+
+# Solicitar permisos de administrador si no los tiene
 check_sudo() {
     if [[ $EUID -ne 0 ]]; then
-        echo -e "${RED}Este script requiere permisos de administrador. Introduce tu contraseña:${NC}"
-        exec sudo "$0" "$@"
+        echo -e "${RED}Este script requiere permisos de administrador.${NC}"
+        exec sudo -p "Por favor, introduce tu contraseña para continuar: " "$0" "$@"
     fi
 }
 
@@ -220,40 +247,91 @@ run_all_maintenance() {
     sleep 3
 }
 
-# --- Menú Principal ---
+# --- AUTO-ACTUALIZACION ---
+check_for_updates() {
+    echo -e "${CYAN}Buscando actualizaciones...${NC}"
+    
+    REMOTE_VERSION=$(curl -sL "${RAW_REPO_URL}/version.txt")
+    
+    if [ -z "$REMOTE_VERSION" ]; then
+        echo -e "${RED}❌ Error: No se pudo contactar con GitHub. Revisa tu conexión a internet.${NC}"
+        press_any_key
+        return
+    fi
+    
+    echo -e "${BLUE}Versión actual:   ${GREEN}$CURRENT_VERSION${NC}"
+    echo -e "${BLUE}Última versión:   ${GREEN}$REMOTE_VERSION${NC}"
+    
+    if [ "$CURRENT_VERSION" = "$REMOTE_VERSION" ]; then
+        echo -e "\n${GREEN}✅ ¡Estás al día! Ya tienes la última versión.${NC}"
+    elif [ "$(printf '%s\n%s\n' "$REMOTE_VERSION" "$CURRENT_VERSION" | sort -V | head -n1)" = "$CURRENT_VERSION" ]; then
+        echo -e "\n${YELLOW}✨ ¡Nueva versión disponible!${NC}"
+        read -p "   ¿Deseas actualizar ahora? (S/n): " choice
+        
+        # Si la elección está vacía o es 's'/'S', se actualiza.
+        if [[ -z "$choice" || "$choice" == "s" || "$choice" == "S" ]]; then
+            echo -n -e "${CYAN}Descargando la nueva versión...${NC}"
+            
+            SCRIPT_PATH=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
+            TMP_FILE=$(mktemp)
+            
+            # El comando de descarga se ejecuta en segundo plano para poder mostrar el spinner
+            curl -sL "${RAW_REPO_URL}/macos_mantenimiento.sh" -o "$TMP_FILE" &
+            spinner $! # Inicia el spinner con el PID del proceso curl
+            
+            # Verificar si la descarga fue exitosa (el archivo temporal no está vacío)
+            if [ -s "$TMP_FILE" ]; then
+                echo -e "${GREEN}✅ Descarga completa.${NC}"
+                chmod +x "$TMP_FILE"
+                mv "$TMP_FILE" "$SCRIPT_PATH"
+                
+                echo -e "${GREEN}🔄 ¡Actualización completada! El script se reiniciará ahora...${NC}"
+                sleep 2
+                
+                # --- LA MAGIA DEL AUTO-REINICIO ---
+                exec "$SCRIPT_PATH"
+            else
+                echo -e "${RED}❌ Error: La descarga falló. El archivo está vacío.${NC}"
+                rm -f "$TMP_FILE"
+            fi
+        else
+            echo -e "${YELLOW}Actualización cancelada.${NC}"
+        fi
+    else
+        echo -e "\n${CYAN}Estás utilizando una versión de desarrollo (más nueva que la oficial).${NC}"
+    fi
+    press_any_key
+}
+
+# --- MENÚ PRINCIPAL ---
 show_menu() {
     clear
-    echo -e "${GREEN}--- Menú de Mantenimiento para macOS v2.0 ---${NC}"
-    echo -e "${BLUE}Selecciona una opción:${NC}"
-    echo "------------------------------------------------------"
-    echo -e "${YELLOW}  1.${NC} Limpieza General "
-    echo -e "${YELLOW}  2.${NC} Mantenimiento del Sistema "
-    echo -e "${YELLOW}  3.${NC} Actualizar Homebrew "
-    echo "------------------------------------------------------"
-    echo -e "${YELLOW}  A.${NC} Ejecutar TODO el Mantenimiento "
-    echo -e "${YELLOW}  Y.${NC} Próximamente "
-    echo -e "${YELLOW}  X.${NC} Salir"
-    echo "------------------------------------------------------"
-    read -p "Introduce tu elección: " choice
+    echo -e "${GREEN}======================================================${NC}"
+    echo -e "${GREEN}          MAINTENANCE TOOL FOR MACOS v${CURRENT_VERSION}         ${NC}"
+    echo -e "${GREEN}======================================================${NC}"
+    echo -e "${BLUE}  Bienvenido, ${SUDO_USER:-$USER}. Selecciona una tarea.${NC}"
+    echo ""
+    echo -e "   ${YELLOW}1)${NC} Limpieza General (Cachés, Logs, Swap)"
+    echo -e "   ${YELLOW}2)${NC} Mantenimiento del Sistema (Discos, RAM, Red)"
+    echo -e "   ${YELLOW}3)${NC} Actualizar Homebrew (Paquetes y Fórmulas)"
+    echo -e "   ${YELLOW}4)${NC} Instrucciones para revisión profunda (fsck)"
+    echo "   ----------------------------------------------------"
+    echo -e "   ${CYAN}A)${NC} Ejecutar TODO el Mantenimiento"
+    echo ""
+    echo -e "   ${YELLOW}Y)${NC} Buscar Actualizaciones del Script"
+    echo -e "   ${RED}X)${NC} Salir"
+    echo -e "${GREEN}======================================================${NC}"
+    read -p "   >> Introduce tu elección: " choice
     echo ""
 
     case "$choice" in
-        1) group_clean_all ;;
-        2) group_system_maintenance ;;
-        3) update_homebrew ;;
-        A|a) run_all_maintenance ;;
-        Y|y)
-            echo -e "${YELLOW}¡Próximamente más funciones! Visita mi repositorio para estar al tanto:${NC}"
-            echo -e "${BLUE}${REPO_URL}${NC}"
-            # Abre el navegador si es posible
-            if command -v open &>/dev/null; then
-                open "$REPO_URL"
-            elif command -v xdg-open &>/dev/null; then
-                xdg-open "$REPO_URL"
-            fi
-            sleep 5
-            ;;
-        X|x) echo -e "${BLUE}Saliendo del script. ¡Hasta pronto!${NC}"; exit 0 ;;
+        1) group_clean_all; press_any_key ;;
+        2) group_system_maintenance; press_any_key ;;
+        3) update_homebrew; press_any_key ;;
+        4) show_fsck_instruction ;; # Esta ya tiene su propia pausa
+        A|a) run_all_maintenance; press_any_key ;;
+        Y|y) check_for_updates ;; # El actualizador maneja su propia pausa/reinicio
+        X|x) echo -e "${BLUE}Saliendo... ¡Hasta pronto!${NC}"; exit 0 ;;
         *) echo -e "${RED}Opción inválida. Por favor, intenta de nuevo.${NC}"; sleep 2 ;;
     esac
 }
