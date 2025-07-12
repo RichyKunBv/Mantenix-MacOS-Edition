@@ -30,11 +30,11 @@ Ejemplo:
 
 ---
 
-## Funciones del Script (v2.1)
+## Funciones del Script (v2.2)
 
-La versión 2.1 del script ofrece un menú organizado con las siguientes opciones:
+La versión 2.2 del script ofrece un menú organizado con las siguientes opciones:
 
-![Captura de Pantalla 2025-06-26 a la(s) 11 36 51 p m](https://github.com/user-attachments/assets/3e7b2691-aca7-4fd1-ba50-c5f3c663fe97)
+<img width="383" height="253" alt="Captura de pantalla 2025-07-11 a la(s) 9 48 37 p m" src="https://github.com/user-attachments/assets/a9a508af-96a1-48c8-838a-1f7368cce8bb" />
 
 
 ### 1. Limpieza General
@@ -61,6 +61,14 @@ Esta opción te permite **mantener Homebrew y tus paquetes actualizados**:
 ### 4. Ejecutar todo
 * **A. Ejecutar TODO el Mantenimiento:** Realiza de forma consecutiva todas las tareas incluidas en "Limpieza General", "Mantenimiento del Sistema" y "Actualizar Homebrew".
 
+### 5. Reporte de salud del Mac
+Esta opcion te da informacion sobre tu sistema como el estado de la bateria, espacio usado, tu procesador y cuanta ram tienes
+
+<img width="385" height="237" alt="Captura de pantalla 2025-07-11 a la(s) 9 49 55 p m" src="https://github.com/user-attachments/assets/b30daebd-8352-42fa-9f8d-2c43ff8d4bc2" />
+
+### 6. Limpiar cache de Xcode
+* **B. Esta opcion limpia el cache de Xcode ya que puede llegar a pesar GB
+
 ### Opciones Adicionales del Menú:
 * **Y. El script se autoactualiza con solo un simple click solo le tienes que picar una vez para que se actualice y reinicie en la ultima version disponible.
 
@@ -71,7 +79,7 @@ Esta opción te permite **mantener Homebrew y tus paquetes actualizados**:
 
 ## Compatibilidad
 
-Este script ha sido diseñado para ser compatible con **macOS High Sierra (10.13)** y versiones posteriores, incluyendo las más recientes como **Sonoma (14.x)** y **Sequoia (15.0)**.
+Este script ha sido diseñado para ser compatible con **macOS High Sierra (10.13)** y versiones posteriores, incluyendo las más recientes como **Sequoia (15.0)**.
 
 ---
 
@@ -79,7 +87,7 @@ Este script ha sido diseñado para ser compatible con **macOS High Sierra (10.13
 
 * Es **obligatorio ejecutar el script con permisos de administrador (`sudo`)** para que la mayoría de sus funciones puedan operar correctamente.
 * Algunas funciones, como la **reparación de permisos**, solo son útiles y están disponibles en versiones de macOS más antiguas (Mojave y anteriores).
-* Para una **reparación más profunda del sistema de archivos**, te recomendamos reiniciar tu Mac en **modo de recuperación** (manteniendo `Command + R` al encender) y luego ejecutar el siguiente comando en la Terminal de recuperación:
+* Para una **reparación más profunda del sistema de archivos**, te recomiendo reiniciar tu Mac en **modo de recuperación** (manteniendo `Command + R` al encender) y luego ejecutar el siguiente comando en la Terminal de recuperación:
     ```sh
     /sbin/fsck -fy
     ```
