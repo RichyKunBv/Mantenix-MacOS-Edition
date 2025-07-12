@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mantenimiento macOS
-CURRENT_VERSION="2.1.2"
+CURRENT_VERSION="2.2"
 
 # --- URLs del Repositorio ---
 REPO_URL="https://github.com/RichyKunBv/macOS_Maintenance"
@@ -49,6 +49,9 @@ check_sudo() {
 get_macos_version() {
     sw_vers -productVersion | cut -d '.' -f 2
 }
+
+
+# --- Comandos ---
 
 perform_disk_check() {
     echo -e "${YELLOW}--- Verificando y reparando el volumen principal ---${NC}"
@@ -114,6 +117,55 @@ stop_indexing_processes() {
     sleep 2
 }
 
+
+# --Limpieza cache Xcode--
+clean_xcode_cache() {
+    local XCODE_CACHE_PATH="$HOME/Library/Developer/Xcode/DerivedData"
+        if [ -d "$XCODE_CACHE_PATH" ] && [ "$(ls -A $XCODE_CACHE_PATH)" ]; then
+        echo -e "${YELLOW}Se detectó caché de Xcode (${CYAN}DerivedData${YELLOW}).${NC}"
+        read -p "   ¿Deseas limpiarlo? (puede tardar en regenerarse) (S/n): " choice
+        if [[ -z "$choice" || "$choice" == "s" || "$choice" == "S" ]]; then
+            echo -n -e "${BLUE}Limpiando caché de Xcode...${NC}"
+            rm -rf "$XCODE_CACHE_PATH"/* &
+            spinner $!
+            echo -e "${GREEN}✅ Caché de Xcode limpiado.${NC}"
+        else
+            echo -e "${YELLOW}Omitiendo limpieza de Xcode.${NC}"
+        fi
+    else
+        echo -e "${BLUE}ℹ️ No se encontró caché de Xcode para limpiar.${NC}"
+    fi
+}
+clean_pkg_managers_cache() {
+    echo -e "${YELLOW}--- Buscando cachés de gestores de paquetes ---${NC}"
+    local cleaned_something=false
+    if command -v npm &>/dev/null; then
+        echo -n -e "${BLUE}Limpiando caché de npm...${NC}"
+        npm cache clean --force &>/dev/null &
+        spinner $!
+        echo -e "${GREEN}✅ Caché de npm limpiado.${NC}"
+        cleaned_something=true
+    fi
+    if command -v pip &>/dev/null; then
+        echo -n -e "${BLUE}Limpiando caché de pip...${NC}"
+        pip cache purge &>/dev/null &
+        spinner $!
+        echo -e "${GREEN}✅ Caché de pip limpiado.${NC}"
+        cleaned_something=true
+    fi
+    if ! $cleaned_something; then
+        echo -e "${BLUE}ℹ️ No se encontraron gestores de paquetes (npm, pip) para limpiar.${NC}"
+    fi
+}
+developer_tools_cleanup() {
+    echo -e "${CYAN}--- Limpieza de Herramientas de Desarrollo ---${NC}"
+    clean_xcode_cache
+    echo "" 
+    clean_pkg_managers_cache
+}
+
+
+# --Revisión profunda--
 show_fsck_instruction() {
     echo -e "${YELLOW}--- Instrucción para fsck en modo de recuperación ---${NC}"
     echo -e "${BLUE}Para verificar y reparar el sistema de archivos de manera más profunda, reinicia tu Mac en ${RED}modo de recuperación${NC} (manteniendo Command + R al iniciar) y luego ejecuta la siguiente línea en la Terminal:${NC}"
@@ -163,6 +215,9 @@ clean_swap_files() {
 }
 
 
+# --- Indices ---
+
+# -- Limpieza General --    --
 group_clean_all() {
     echo -e "${BLUE}--- Ejecutando todas las tareas de limpieza ---${NC}"
     clean_caches_and_temp
@@ -172,6 +227,8 @@ group_clean_all() {
     sleep 2
 }
 
+
+# --Mantenimiento del Sistema--
 group_system_maintenance() {
     echo -e "${BLUE}--- Ejecutando tareas de mantenimiento del sistema ---${NC}"
     perform_disk_check
@@ -184,6 +241,8 @@ group_system_maintenance() {
     sleep 2
 }
 
+
+# --Actualizar Homebrew--
 update_homebrew() {
     echo -e "${YELLOW}--- Actualización de Homebrew ---${NC}"
     
@@ -237,17 +296,22 @@ BREW_UPDATE
     sleep 3
 }
 
+
+# --Ejecutar TODO el Mantenimiento--
 run_all_maintenance() {
     echo -e "${BLUE}--- Ejecutando TODAS las tareas de Mantenimiento ---${NC}"
     group_clean_all # Contiene la confirmación de swap
     group_system_maintenance
     update_homebrew # Se ejecuta sin detección previa para esta opción
+    clean_xcode_cache
     echo -e "${GREEN}Todas las tareas de mantenimiento y actualización completadas.${NC}"
     echo -e "${YELLOW}Se recomienda reiniciar el sistema para aplicar todos los cambios.${NC}"
     sleep 3
 }
 
 # --- AUTO-ACTUALIZACION ---
+
+# --Buscar Actualizaciones del Script--
 check_for_updates() {
     echo -e "${CYAN}Buscando actualizaciones...${NC}"
     
@@ -303,6 +367,60 @@ check_for_updates() {
     press_any_key
 }
 
+#--- SALUD MAC ---
+
+# --Salud del Sistema--
+show_health_report() {
+    clear
+    echo -e "${GREEN}======================================================${NC}"
+    echo -e "${GREEN}                REPORTE DE SALUD DEL MAC              ${NC}"
+    echo -e "${GREEN}======================================================${NC}"
+    
+    # --- Batería ---
+    echo -e "${CYAN}🔋 BATERÍA:${NC}"
+    if pmset -g batt | grep -q 'InternalBattery'; then
+        local PERCENTAGE=$(pmset -g batt | grep -o '[0-9]*%;' | tr -d '%;')
+        local HEALTH_INFO=$(system_profiler SPPowerDataType)
+        local CYCLE_COUNT=$(echo "$HEALTH_INFO" | grep "Cycle Count" | awk '{print $3}')
+        local MAX_CAPACITY=$(echo "$HEALTH_INFO" | grep "Maximum Capacity" | awk '{print $3}')
+        echo -e "   - Nivel de Carga:   ${YELLOW}$PERCENTAGE%${NC}"
+        echo -e "   - Ciclos de Carga:  ${YELLOW}${CYCLE_COUNT:-N/A}${NC}"
+        if [ -n "$MAX_CAPACITY" ]; then
+            echo -e "   - Salud de Batería: ${YELLOW}${MAX_CAPACITY}${NC}"
+        else
+            local CONDITION=$(echo "$HEALTH_INFO" | grep "Condition" | awk '{print $2}')
+            echo -e "   - Condición:        ${YELLOW}${CONDITION:-N/A}${NC}"
+        fi
+    else
+        echo -e "   ${BLUE}No se detectó batería (Mac de escritorio).${NC}"
+    fi
+    echo ""
+
+    # --- Almacenamiento ---
+    echo -e "${CYAN}💾 ALMACENAMIENTO:${NC}"
+    local major_ver=$(sw_vers -productVersion | cut -d '.' -f 1)
+    local data_volume_path="/"
+    if [[ "$major_ver" -ge 11 ]]; then
+        data_volume_path="/System/Volumes/Data"
+    fi
+    local DISK_INFO=$(df -h "$data_volume_path" | tail -n 1)
+    echo -e "   - Capacidad Total:  ${YELLOW}$(echo "$DISK_INFO" | awk '{print $2}')${NC}"
+    echo -e "   - Espacio Utilizado: ${YELLOW}$(echo "$DISK_INFO" | awk '{print $3}') ($(echo "$DISK_INFO" | awk '{print $5}'))${NC}"
+    echo -e "   - Espacio Disponible: ${YELLOW}$(echo "$DISK_INFO" | awk '{print $4}')${NC}"
+    echo ""
+
+    # --- CPU y RAM ---
+    echo -e "${CYAN}🧠 CPU Y MEMORIA RAM:${NC}"
+    local CPU_MODEL=$(sysctl -n machdep.cpu.brand_string | sed 's/@.*//' | xargs)
+    local RAM_BYTES=$(sysctl -n hw.memsize)
+    local RAM_GB=$(echo "scale=2; $RAM_BYTES / 1024 / 1024 / 1024" | bc)
+    echo -e "   - CPU: ${YELLOW}$CPU_MODEL${NC}"
+    echo -e "   - RAM Instalada: ${YELLOW}${RAM_GB} GB${NC}"
+    echo -e "${GREEN}======================================================${NC}"
+press_any_key
+}
+
+
 # --- MENÚ PRINCIPAL ---
 show_menu() {
     clear
@@ -311,12 +429,14 @@ show_menu() {
     echo -e "${GREEN}======================================================${NC}"
     echo -e "${BLUE}  Bienvenido, ${SUDO_USER:-$USER}. Selecciona una tarea.${NC}"
     echo ""
-    echo -e "   ${YELLOW}1)${NC} Limpieza General (Cachés, Logs, Swap)"
-    echo -e "   ${YELLOW}2)${NC} Mantenimiento del Sistema (Discos, RAM, Red)"
-    echo -e "   ${YELLOW}3)${NC} Actualizar Homebrew (Paquetes y Fórmulas)"
-    echo -e "   ${YELLOW}4)${NC} Instrucciones para revisión profunda (fsck)"
+    echo -e "   ${YELLOW}1)${NC} Limpieza General"
+    echo -e "   ${YELLOW}2)${NC} Mantenimiento del Sistema"
+    echo -e "   ${YELLOW}3)${NC} Actualizar Homebrew"
+    echo -e "   ${YELLOW}4)${NC} Revisión profunda"
+    echo -e "   ${YELLOW}5)${NC} Salud del Sistema"
     echo "   ----------------------------------------------------"
     echo -e "   ${CYAN}A)${NC} Ejecutar TODO el Mantenimiento"
+    echo -e "   ${CYAN}B)${NC} Limpieza cache Xcode"
     echo ""
     echo -e "   ${YELLOW}Y)${NC} Buscar Actualizaciones del Script"
     echo -e "   ${RED}X)${NC} Salir"
@@ -328,9 +448,11 @@ show_menu() {
         1) group_clean_all; press_any_key ;;
         2) group_system_maintenance; press_any_key ;;
         3) update_homebrew; press_any_key ;;
-        4) show_fsck_instruction ;; # Esta ya tiene su propia pausa
+        4) show_fsck_instruction ;; 
+        5) show_health_report ;;
         A|a) run_all_maintenance; press_any_key ;;
-        Y|y) check_for_updates ;; # El actualizador maneja su propia pausa/reinicio
+        B|b) clean_xcode_cache; press_any_key ;;
+        Y|y) check_for_updates ;; 
         X|x) echo -e "${BLUE}Saliendo... ¡Hasta pronto!${NC}"; exit 0 ;;
         *) echo -e "${RED}Opción inválida. Por favor, intenta de nuevo.${NC}"; sleep 2 ;;
     esac
