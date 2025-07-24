@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mantenimiento macOS
-CURRENT_VERSION="2.2"
+CURRENT_VERSION="2.2.1"
 
 # --- URLs del Repositorio ---
 REPO_URL="https://github.com/RichyKunBv/macOS_Maintenance"
@@ -45,9 +45,75 @@ check_sudo() {
     fi
 }
 
-# Identificar versión de macOS
+# --- Funciones de Detección de Sistema ---
+
+# Obtener versión completa de macOS (ej: 10.15.7)
+get_macos_version_full() {
+    sw_vers -productVersion
+}
+
+# Obtener versión mayor de macOS (ej: 10 o 11)
+get_macos_major_version() {
+    sw_vers -productVersion | cut -d '.' -f 1
+}
+
+# Obtener versión menor de macOS (ej: 15 para 10.15)
 get_macos_version() {
     sw_vers -productVersion | cut -d '.' -f 2
+}
+
+# Comprobar si la versión actual es al menos la requerida
+is_at_least_version() {
+    local required=$1
+    local current=$(get_macos_version_full)
+    if [[ $(echo "$current $required" | tr ' ' '\n' | sort -V | head -n1) == "$required" ]]; then
+        return 0 # true, es al menos esta versión
+    else
+        return 1 # false, es menor que esta versión
+    fi
+}
+
+# Obtener la arquitectura de CPU (Intel o Apple Silicon)
+get_cpu_architecture() {
+    if [ "$(uname -m)" = "arm64" ]; then
+        echo "apple_silicon"
+    else
+        echo "intel"
+    fi
+}
+
+# Obtener la ruta del volumen de sistema según la versión de macOS
+get_system_volume_path() {
+    local major_ver=$(get_macos_major_version)
+    local minor_ver=$(get_macos_minor_version)
+    
+    if [[ "$major_ver" -ge 11 ]]; then
+        echo "/System/Volumes/Data"
+    elif [[ "$major_ver" -eq 10 && "$minor_ver" -ge 15 ]]; then
+        echo "/System/Volumes/Data"
+    else
+        echo "/"
+    fi
+}
+
+# Verificar disponibilidad de una herramienta
+check_tool_availability() {
+    local tool=$1
+    if command -v "$tool" &>/dev/null; then
+        return 0 # true, herramienta disponible
+    else
+        return 1 # false, herramienta no disponible
+    fi
+}
+
+# Verificar estado de SIP (System Integrity Protection)
+check_sip_status() {
+    if csrutil status | grep -q "enabled"; then
+        echo -e "${YELLOW}SIP está activado. Algunas operaciones pueden estar restringidas.${NC}"
+        return 0 # SIP activado
+    else
+        return 1 # SIP desactivado
+    fi
 }
 
 
@@ -55,8 +121,9 @@ get_macos_version() {
 
 perform_disk_check() {
     echo -e "${YELLOW}--- Verificando y reparando el volumen principal ---${NC}"
-    macos_version=$(get_macos_version)
-    if [[ $macos_version -ge 13 ]]; then
+    
+    # Usar la nueva función de detección de versión
+    if is_at_least_version "10.13"; then
         echo -e "${BLUE}Ejecutando diskutil verifyVolume / (macOS 10.13+)...${NC}"
         diskutil verifyVolume / || echo -e "${RED}Error al verificar el volumen.${NC}"
         echo -e "${BLUE}Ejecutando diskutil repairVolume / (macOS 10.13+)...${NC}"
@@ -73,8 +140,9 @@ perform_disk_check() {
 
 repair_permissions_legacy() {
     echo -e "${YELLOW}--- Reparando permisos del sistema (Solo macOS Mojave y anteriores) ---${NC}"
-    macos_version=$(get_macos_version)
-    if [[ $macos_version -lt 15 ]]; then
+    
+    # Usar la nueva función de detección de versión
+    if ! is_at_least_version "10.15"; then
         echo -e "${BLUE}Ejecutando diskutil repairPermissions /...${NC}"
         diskutil repairPermissions / || echo -e "${RED}Error al reparar permisos.${NC}"
         echo -e "${GREEN}Reparación de permisos completada.${NC}"
@@ -160,7 +228,7 @@ clean_pkg_managers_cache() {
 developer_tools_cleanup() {
     echo -e "${CYAN}--- Limpieza de Herramientas de Desarrollo ---${NC}"
     clean_xcode_cache
-    echo "" 
+    echo ""
     clean_pkg_managers_cache
 }
 
@@ -177,25 +245,78 @@ show_fsck_instruction() {
 
 clean_caches_and_temp() {
     echo -e "${YELLOW}--- Limpiando cachés del sistema, usuario y archivos temporales ---${NC}"
+    
+    # Verificar si tenemos permisos para acceder a ciertas ubicaciones
+    if is_at_least_version "10.14"; then
+        echo -e "${BLUE}Nota: En macOS Mojave y posteriores, es posible que necesites otorgar permisos de acceso completo al disco a Terminal.${NC}"
+    fi
+    
+    # Obtener la ruta correcta del volumen de datos según la versión de macOS
+    local data_volume_path=$(get_system_volume_path)
+    
     echo -e "${BLUE}Eliminando cachés de usuario, logs y estados de aplicaciones guardados...${NC}"
     rm -rf ~/Library/Caches/* ~/Library/Logs/* ~/Library/Saved\ Application\ State/* 2>/dev/null
+    
     echo -e "${BLUE}Eliminando cachés del sistema...${NC}"
-    sudo rm -rf /Library/Caches/* /System/Library/Caches/* /private/var/log/* 2>/dev/null
+    if check_sip_status; then
+        echo -e "${YELLOW}SIP está activado. Algunas operaciones de limpieza pueden estar limitadas.${NC}"
+        sudo rm -rf /Library/Caches/* 2>/dev/null
+        # No intentamos limpiar /System/Library/Caches cuando SIP está activado
+    else
+        sudo rm -rf /Library/Caches/* /System/Library/Caches/* 2>/dev/null
+    fi
+    
+    sudo rm -rf /private/var/log/* 2>/dev/null
+    
     echo -e "${BLUE}Eliminando archivos temporales en /private/var/tmp y /private/var/folders...${NC}"
     sudo rm -rf /private/var/tmp/* /private/var/folders/* 2>/dev/null
+    
     echo -e "${GREEN}Limpieza de cachés y temporales completada.${NC}"
     sleep 2
 }
 
 clean_icons_and_spotlight() {
     echo -e "${YELLOW}--- Limpiando caché de iconos y reconstruyendo índice de Spotlight ---${NC}"
+    
+    # Verificar si tenemos las herramientas necesarias
+    if ! check_tool_availability "mdutil"; then
+        echo -e "${RED}Error: La herramienta mdutil no está disponible en este sistema.${NC}"
+        echo -e "${YELLOW}Omitiendo reconstrucción de índice de Spotlight.${NC}"
+        return
+    fi
+    
+    # Obtener la ruta correcta del volumen de datos según la versión de macOS
+    local data_volume_path=$(get_system_volume_path)
+    
     echo -e "${BLUE}Eliminando caché de iconos...${NC}"
-    sudo find /private/var/folders -name "com.apple.iconservices" -exec rm -rf {} +
+    if is_at_least_version "10.15"; then
+        # En Catalina y posteriores, la ubicación puede ser diferente
+        sudo find /private/var/folders -name "com.apple.iconservices*" -exec rm -rf {} \; 2>/dev/null
+        if [ "$(get_cpu_architecture)" = "apple_silicon" ]; then
+            # Ubicación específica para Apple Silicon
+            sudo find /System/Volumes/Data/private/var/folders -name "com.apple.iconservices*" -exec rm -rf {} \; 2>/dev/null
+        fi
+    else
+        # Para versiones anteriores
+        sudo find /private/var/folders -name "com.apple.iconservices" -exec rm -rf {} + 2>/dev/null
+    fi
+    
     echo -e "${BLUE}Eliminando caché de metadatos...${NC}"
-    sudo find /private/var/folders -name "com.apple.metadata" -exec rm -rf {} +
+    sudo find /private/var/folders -name "com.apple.metadata*" -exec rm -rf {} \; 2>/dev/null
+    
     echo -e "${BLUE}Eliminando caché de Spotlight y reconstruyendo índice...${NC}"
     sudo rm -rf ~/.Spotlight-V100 2>/dev/null
-    sudo mdutil -E /
+    
+    # Reconstruir el índice de Spotlight en la ubicación correcta
+    if is_at_least_version "10.15"; then
+        echo -e "${BLUE}Reconstruyendo índice de Spotlight para macOS Catalina o superior...${NC}"
+        sudo mdutil -i off / && sudo mdutil -i on /
+        sudo mdutil -E $data_volume_path
+    else
+        echo -e "${BLUE}Reconstruyendo índice de Spotlight para macOS Mojave o anterior...${NC}"
+        sudo mdutil -E /
+    fi
+    
     echo -e "${GREEN}Limpieza de iconos y Spotlight completada.${NC}"
     sleep 2
 }
@@ -243,32 +364,56 @@ group_system_maintenance() {
 
 
 # --Actualizar Homebrew--
-update_homebrew() {
-    echo -e "${YELLOW}--- Actualización de Homebrew ---${NC}"
+detect_homebrew() {
+    local arch=$(get_cpu_architecture)
+    if [ "$arch" = "apple_silicon" ]; then
+        if [ -x "/opt/homebrew/bin/brew" ]; then
+            echo "/opt/homebrew/bin/brew"
+            return 0
+        fi
+    else
+        if [ -x "/usr/local/bin/brew" ]; then
+            echo "/usr/local/bin/brew"
+            return 0
+        fi
+    fi
     
-    # Verificar si Homebrew está instalado usando rutas conocidas
-    BREW_PATHS=("/usr/local/bin/brew" "/opt/homebrew/bin/brew" "$HOME/.linuxbrew/bin/brew")
-    BREW_FOUND=0
-    
+    # Búsqueda en rutas adicionales
+    local BREW_PATHS=("$HOME/.linuxbrew/bin/brew" "$HOME/.homebrew/bin/brew")
     for path in "${BREW_PATHS[@]}"; do
         if [[ -x "$path" ]]; then
-            brew="$path"
-            BREW_FOUND=1
-            break
+            echo "$path"
+            return 0
         fi
     done
     
-    if [[ $BREW_FOUND -eq 0 ]] && ! command -v brew &>/dev/null; then
+    # Búsqueda en PATH
+    if command -v brew &>/dev/null; then
+        echo "$(command -v brew)"
+        return 0
+    fi
+    
+    return 1 # No encontrado
+}
+
+update_homebrew() {
+    echo -e "${YELLOW}--- Actualización de Homebrew ---${NC}"
+
+    # Usar la nueva función de detección
+    local brew_path=$(detect_homebrew)
+    if [ -z "$brew_path" ]; then
         echo -e "${RED}❌ Homebrew no está instalado.${NC}"
         echo -e "${YELLOW}Para instalarlo, ejecuta este comando en tu terminal:${NC}"
         echo -e "${BLUE}/bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"${NC}"
         sleep 3
         return
     fi
+    
+    echo -e "${BLUE}🔍 Homebrew detectado en: $brew_path${NC}"
 
     # Obtener usuario original (no root)
     ORIGINAL_USER="${SUDO_USER:-$(logname 2>/dev/null || echo "$USER")}"
-    
+
     if [[ -z "$ORIGINAL_USER" || "$ORIGINAL_USER" == "root" ]]; then
         echo -e "${RED}❌ Error: No se pudo obtener el usuario no-root.${NC}"
         echo -e "${YELLOW}Ejecuta el script sin 'sudo' para actualizar Homebrew.${NC}"
@@ -277,19 +422,23 @@ update_homebrew() {
     fi
 
     echo -e "${BLUE}🔄 Actualizando Homebrew como usuario '$ORIGINAL_USER'...${NC}"
-    
-    # Comandos para actualizar
-    sudo -u "$ORIGINAL_USER" bash <<'BREW_UPDATE'
+
+    # Comandos para actualizar usando la ruta específica de brew
+    sudo -u "$ORIGINAL_USER" bash <<BREW_UPDATE
         # Cargar entorno del usuario
         [[ -f ~/.bash_profile ]] && source ~/.bash_profile
         [[ -f ~/.zshrc ]] && source ~/.zshrc
+
+        # Usar la ruta específica de brew detectada
+        BREW_PATH="$brew_path"
+        echo "Usando Homebrew en: \$BREW_PATH"
         
         # Actualizar todo
-        brew update
-        brew upgrade
-        brew upgrade --cask
-        brew cleanup
-        brew doctor
+        \$BREW_PATH update
+        \$BREW_PATH upgrade
+        \$BREW_PATH upgrade --cask
+        \$BREW_PATH cleanup
+        \$BREW_PATH doctor
 BREW_UPDATE
 
     echo -e "${GREEN}✅ Homebrew y todos los paquetes actualizados correctamente.${NC}"
@@ -314,44 +463,44 @@ run_all_maintenance() {
 # --Buscar Actualizaciones del Script--
 check_for_updates() {
     echo -e "${CYAN}Buscando actualizaciones...${NC}"
-    
+
     REMOTE_VERSION=$(curl -sL "${RAW_REPO_URL}/version.txt")
-    
+
     if [ -z "$REMOTE_VERSION" ]; then
         echo -e "${RED}❌ Error: No se pudo contactar con GitHub. Revisa tu conexión a internet.${NC}"
         press_any_key
         return
     fi
-    
+
     echo -e "${BLUE}Versión actual:   ${GREEN}$CURRENT_VERSION${NC}"
     echo -e "${BLUE}Última versión:   ${GREEN}$REMOTE_VERSION${NC}"
-    
+
     if [ "$CURRENT_VERSION" = "$REMOTE_VERSION" ]; then
         echo -e "\n${GREEN}✅ ¡Estás al día! Ya tienes la última versión.${NC}"
     elif [ "$(printf '%s\n%s\n' "$REMOTE_VERSION" "$CURRENT_VERSION" | sort -V | head -n1)" = "$CURRENT_VERSION" ]; then
         echo -e "\n${YELLOW}✨ ¡Nueva versión disponible!${NC}"
         read -p "   ¿Deseas actualizar ahora? (S/n): " choice
-        
+
         # Si la elección está vacía o es 's'/'S', se actualiza.
         if [[ -z "$choice" || "$choice" == "s" || "$choice" == "S" ]]; then
             echo -n -e "${CYAN}Descargando la nueva versión...${NC}"
-            
+
             SCRIPT_PATH=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
             TMP_FILE=$(mktemp)
-            
+
             # El comando de descarga se ejecuta en segundo plano para poder mostrar el spinner
             curl -sL "${RAW_REPO_URL}/macos_mantenimiento.sh" -o "$TMP_FILE" &
             spinner $! # Inicia el spinner con el PID del proceso curl
-            
+
             # Verificar si la descarga fue exitosa (el archivo temporal no está vacío)
             if [ -s "$TMP_FILE" ]; then
                 echo -e "${GREEN}✅ Descarga completa.${NC}"
                 chmod +x "$TMP_FILE"
                 mv "$TMP_FILE" "$SCRIPT_PATH"
-                
+
                 echo -e "${GREEN}🔄 ¡Actualización completada! El script se reiniciará ahora...${NC}"
                 sleep 2
-                
+
                 # --- LA MAGIA DEL AUTO-REINICIO ---
                 exec "$SCRIPT_PATH"
             else
@@ -375,7 +524,7 @@ show_health_report() {
     echo -e "${GREEN}======================================================${NC}"
     echo -e "${GREEN}                REPORTE DE SALUD DEL MAC              ${NC}"
     echo -e "${GREEN}======================================================${NC}"
-    
+
     # --- Batería ---
     echo -e "${CYAN}🔋 BATERÍA:${NC}"
     if pmset -g batt | grep -q 'InternalBattery'; then
@@ -398,11 +547,7 @@ show_health_report() {
 
     # --- Almacenamiento ---
     echo -e "${CYAN}💾 ALMACENAMIENTO:${NC}"
-    local major_ver=$(sw_vers -productVersion | cut -d '.' -f 1)
-    local data_volume_path="/"
-    if [[ "$major_ver" -ge 11 ]]; then
-        data_volume_path="/System/Volumes/Data"
-    fi
+    local data_volume_path=$(get_system_volume_path)
     local DISK_INFO=$(df -h "$data_volume_path" | tail -n 1)
     echo -e "   - Capacidad Total:  ${YELLOW}$(echo "$DISK_INFO" | awk '{print $2}')${NC}"
     echo -e "   - Espacio Utilizado: ${YELLOW}$(echo "$DISK_INFO" | awk '{print $3}') ($(echo "$DISK_INFO" | awk '{print $5}'))${NC}"
@@ -448,18 +593,48 @@ show_menu() {
         1) group_clean_all; press_any_key ;;
         2) group_system_maintenance; press_any_key ;;
         3) update_homebrew; press_any_key ;;
-        4) show_fsck_instruction ;; 
+        4) show_fsck_instruction ;;
         5) show_health_report ;;
         A|a) run_all_maintenance; press_any_key ;;
         B|b) clean_xcode_cache; press_any_key ;;
-        Y|y) check_for_updates ;; 
+        Y|y) check_for_updates ;;
         X|x) echo -e "${BLUE}Saliendo... ¡Hasta pronto!${NC}"; exit 0 ;;
         *) echo -e "${RED}Opción inválida. Por favor, intenta de nuevo.${NC}"; sleep 2 ;;
     esac
 }
 
+# --- Verificación de Compatibilidad ---
+check_compatibility() {
+    echo -e "${CYAN}Verificando compatibilidad del sistema...${NC}"
+    local macos_version=$(get_macos_version_full)
+    local arch=$(get_cpu_architecture)
+    
+    echo -e "${BLUE}Versión de macOS detectada: ${GREEN}$macos_version${NC}"
+    echo -e "${BLUE}Arquitectura detectada: ${GREEN}$arch${NC}"
+    
+    # Verificar versión mínima (High Sierra = 10.13)
+    if ! is_at_least_version "10.13"; then
+        echo -e "${RED}⚠️ Este script requiere macOS High Sierra (10.13) o superior.${NC}"
+        echo -e "${YELLOW}Tu versión actual ($macos_version) no es compatible.${NC}"
+        exit 1
+    fi
+    
+    # Verificar SIP si es necesario para algunas operaciones
+    check_sip_status
+    
+    # Verificar permisos de acceso al disco
+    if is_at_least_version "10.14"; then
+        echo -e "${YELLOW}Nota: En macOS Mojave (10.14) y posteriores, algunas operaciones pueden requerir permisos adicionales.${NC}"
+        echo -e "${BLUE}Si encuentras errores de permisos, ve a Preferencias del Sistema > Seguridad y Privacidad > Privacidad > Acceso Completo al Disco y añade Terminal.${NC}"
+    fi
+    
+    echo -e "${GREEN}✅ Sistema compatible. Continuando...${NC}"
+    sleep 2
+}
+
 # --- Bucle Principal del Script ---
 check_sudo
+check_compatibility
 while true; do
     show_menu
 done
