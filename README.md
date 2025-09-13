@@ -1,4 +1,4 @@
-# macOS_Maintenance
+# 🚀 Mantenix: El Asistente de Mantenimiento Definitivo para MacOS
 
 ---
 
@@ -30,11 +30,12 @@ Ejemplo:
 
 ---
 
-## Funciones del Script (v2.2)
+## Funciones del Script (v3.0)
 
-La versión 2.2 del script ofrece un menú organizado con las siguientes opciones:
+La versión 3.0 del script ofrece un menú organizado con las siguientes opciones:
 
-<img width="383" height="253" alt="Captura de pantalla 2025-07-11 a la(s) 9 48 37 p m" src="https://github.com/user-attachments/assets/a9a508af-96a1-48c8-838a-1f7368cce8bb" />
+
+<img width="387" height="341" alt="Captura de pantalla 2025-09-12 a la(s) 6 39 58 p m" src="https://github.com/user-attachments/assets/96eddb85-375d-4203-aead-67d3cd0cf4fd" />
 
 
 ### 1. Limpieza General
@@ -93,4 +94,6 @@ Este script ha sido diseñado para ser compatible con **macOS High Sierra (10.13
     ```
 
 ---
-```
+
+### --- NOTAS --- 
+* Si tienes de la version Legacy (macos_mantenimiento.sh) tienes que actualizar 2 veces (Usando la funcion "Y") para tener la nueva version (MantenixM)
