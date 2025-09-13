@@ -75,6 +75,15 @@ Esta opcion te da informacion sobre tu sistema como el estado de la bateria, esp
 
 ![Captura de Pantalla 2025-06-27 a la(s) 12 14 25 a m](https://github.com/user-attachments/assets/94fe0b92-ec5a-4834-860a-d373a9a2e06d)
 
+### Revision de seguridad
+* **6 Esta opcion verifica si estan activos los metodos de seguridad integrados en el sistema como Firewall y Gatekeeper
+<img width="561" height="181" alt="Captura de pantalla 2025-09-12 a la(s) 6 45 42 p m" src="https://github.com/user-attachments/assets/b08359e2-c0f2-4a72-8fda-8b228abad058" />
+
+
+### Limpieza de cache de aplicaciones
+* **7 Limpia el cache de aplicaciones comunes
+ <img width="386" height="59" alt="Captura de pantalla 2025-09-12 a la(s) 6 47 31 p m" src="https://github.com/user-attachments/assets/3451f0dd-05ef-48f8-9ab3-e3eb99070e39" />
+ 
 
 ---
 
