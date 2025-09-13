@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mantenimiento macOS
-CURRENT_VERSION="2.2.1"
+CURRENT_VERSION="2.2.2"
 
 # --- URLs del Repositorio ---
 REPO_URL="https://github.com/RichyKunBv/macOS_Maintenance"
@@ -85,7 +85,7 @@ get_cpu_architecture() {
 # Obtener la ruta del volumen de sistema según la versión de macOS
 get_system_volume_path() {
     local major_ver=$(get_macos_major_version)
-    local minor_ver=$(get_macos_minor_version)
+    local minor_ver=$(get_macos_version)
     
     if [[ "$major_ver" -ge 11 ]]; then
         echo "/System/Volumes/Data"
