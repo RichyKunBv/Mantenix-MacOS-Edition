@@ -3,8 +3,8 @@
 CURRENT_VERSION="2.2.2"
 
 # --- URLs del Repositorio ---
-REPO_URL="https://github.com/RichyKunBv/macOS_Maintenance"
-RAW_REPO_URL="https://raw.githubusercontent.com/RichyKunBv/macOS_Maintenance/main"
+REPO_URL="https://github.com/RichyKunBv/Mantenix-MacOS-Edition"
+RAW_REPO_URL="https://raw.githubusercontent.com/RichyKunBv/MantenixM/main"
 
 # --- Colores y Estilos ---
 GREEN='\033[1;32m'
