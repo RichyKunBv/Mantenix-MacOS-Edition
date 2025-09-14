@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mantenimiento macOS
-CURRENT_VERSION="2.2.2"
+CURRENT_VERSION="2.2.3"
 
 # --- URLs del Repositorio ---
 REPO_URL="https://github.com/RichyKunBv/Mantenix-MacOS-Edition"
