@@ -1,10 +1,12 @@
 #!/bin/bash
 # Mantenimiento macOS
-CURRENT_VERSION="3.0.1"
+CURRENT_VERSION="3.0.2"
 
 # --- URLs del Repositorio ---
 REPO_URL="https://github.com/RichyKunBv/Mantenix-MacOS-Edition"
 RAW_REPO_URL="https://raw.githubusercontent.com/RichyKunBv/Mantenix-MacOS-Edition/main"
+
+SCRIPT_FILENAME="MantenixM.sh"
 
 # --- Colores y Estilos ---
 GREEN='\033[1;32m'
@@ -530,7 +532,6 @@ run_all_maintenance() {
 check_for_updates() {
     echo -e "${CYAN}Buscando actualizaciones...${NC}"
 
-    local SCRIPT_FILENAME=$(basename "$0")
 
     # Intenta descargar el archivo de versión desde la URL correcta
     REMOTE_VERSION=$(curl -sL "${RAW_REPO_URL}/version.txt")
