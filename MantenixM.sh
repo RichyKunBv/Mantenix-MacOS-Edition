@@ -1,10 +1,10 @@
 #!/bin/bash
 # Mantenimiento macOS
-CURRENT_VERSION="3.0"
+CURRENT_VERSION="3.0.1"
 
 # --- URLs del Repositorio ---
 REPO_URL="https://github.com/RichyKunBv/Mantenix-MacOS-Edition"
-RAW_REPO_URL="https://raw.githubusercontent.com/RichyKunBv/MantenixM/main"
+RAW_REPO_URL="https://raw.githubusercontent.com/RichyKunBv/Mantenix-MacOS-Edition/main"
 
 # --- Colores y Estilos ---
 GREEN='\033[1;32m'
@@ -527,15 +527,16 @@ run_all_maintenance() {
 }
 
 # --- AUTO-ACTUALIZACION ---
-
-# --Buscar Actualizaciones del Script--
 check_for_updates() {
     echo -e "${CYAN}Buscando actualizaciones...${NC}"
 
+    local SCRIPT_FILENAME=$(basename "$0")
+
+    # Intenta descargar el archivo de versión desde la URL correcta
     REMOTE_VERSION=$(curl -sL "${RAW_REPO_URL}/version.txt")
 
     if [ -z "$REMOTE_VERSION" ]; then
-        echo -e "${RED}❌ Error: No se pudo contactar con GitHub. Revisa tu conexión a internet.${NC}"
+        echo -e "${RED}❌ Error: No se pudo contactar con GitHub. Revisa tu conexión.${NC}"
         press_any_key
         return
     fi
@@ -549,30 +550,27 @@ check_for_updates() {
         echo -e "\n${YELLOW}✨ ¡Nueva versión disponible!${NC}"
         read -p "   ¿Deseas actualizar ahora? (S/n): " choice
 
-        # Si la elección está vacía o es 's'/'S', se actualiza.
         if [[ -z "$choice" || "$choice" == "s" || "$choice" == "S" ]]; then
-            echo -n -e "${CYAN}Descargando la nueva versión...${NC}"
+            echo -n -e "${CYAN}Descargando la nueva versión de '${SCRIPT_FILENAME}'...${NC}"
 
-            SCRIPT_PATH=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
-            TMP_FILE=$(mktemp)
+            local SCRIPT_PATH=$(cd "$(dirname "$0")" && pwd)/"$SCRIPT_FILENAME"
+            local TMP_FILE=$(mktemp)
+            local DOWNLOAD_URL="${RAW_REPO_URL}/${SCRIPT_FILENAME}"
 
-            # El comando de descarga se ejecuta en segundo plano para poder mostrar el spinner
-            curl -sL "${RAW_REPO_URL}/macos_mantenimiento.sh" -o "$TMP_FILE" &
-            spinner $! # Inicia el spinner con el PID del proceso curl
+            curl -sL "${DOWNLOAD_URL}" -o "$TMP_FILE" &
+            spinner $!
 
-            # Verificar si la descarga fue exitosa (el archivo temporal no está vacío)
-            if [ -s "$TMP_FILE" ]; then
+            # Comprueba si la descarga fue exitosa y no es una página de error de GitHub
+            if [ -s "$TMP_FILE" ] && ! grep -q "400: Invalid request" "$TMP_FILE" && ! grep -q "404: Not Found" "$TMP_FILE"; then
                 echo -e "${GREEN}✅ Descarga completa.${NC}"
                 chmod +x "$TMP_FILE"
                 mv "$TMP_FILE" "$SCRIPT_PATH"
-
                 echo -e "${GREEN}🔄 ¡Actualización completada! El script se reiniciará ahora...${NC}"
                 sleep 2
-
-                # --- LA MAGIA DEL AUTO-REINICIO ---
                 exec "$SCRIPT_PATH"
             else
-                echo -e "${RED}❌ Error: La descarga falló. El archivo está vacío.${NC}"
+                echo -e "${RED}❌ Error: La descarga falló.${NC}"
+                echo -e "${YELLOW}   Posibles causas: El repositorio es privado o el archivo '${SCRIPT_FILENAME}' no existe en GitHub.${NC}"
                 rm -f "$TMP_FILE"
             fi
         else
