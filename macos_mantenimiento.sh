@@ -489,7 +489,7 @@ check_for_updates() {
             TMP_FILE=$(mktemp)
 
             # El comando de descarga se ejecuta en segundo plano para poder mostrar el spinner
-            curl -sL "${RAW_REPO_URL}/macos_mantenimiento.sh" -o "$TMP_FILE" &
+            curl -sL "${RAW_REPO_URL}/MantenixM.sh" -o "$TMP_FILE" &
             spinner $! # Inicia el spinner con el PID del proceso curl
 
             # Verificar si la descarga fue exitosa (el archivo temporal no está vacío)
