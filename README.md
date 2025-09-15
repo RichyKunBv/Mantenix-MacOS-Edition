@@ -38,7 +38,7 @@ La versión 3.0 del script ofrece un menú organizado con las siguientes opcione
 <img width="387" height="341" alt="Captura de pantalla 2025-09-12 a la(s) 6 39 58 p m" src="https://github.com/user-attachments/assets/96eddb85-375d-4203-aead-67d3cd0cf4fd" />
 
 
-### 1. Limpieza General
+### 1. Limpieza General¹
 Esta opción ejecuta varias tareas para **liberar espacio y optimizar el rendimiento**:
 * **Limpieza de cachés de sistema, usuario, logs** y estados de aplicaciones guardados.
 * **Eliminación de metadatos y cachés de iconos y Spotlight**.
@@ -47,12 +47,12 @@ Esta opción ejecuta varias tareas para **liberar espacio y optimizar el rendimi
 ### 2. Mantenimiento del Sistema
 Aquí encontrarás funciones esenciales para el **buen funcionamiento de los componentes centrales** de tu macOS:
 * **Verificación y reparación del disco principal** (compatible con sistemas de archivos APFS y HFS+).
-* **Reparación de permisos del sistema** (solo relevante para macOS Mojave 10.14 y versiones anteriores).
+* **Reparación de permisos del sistema²** (solo relevante para macOS Mojave 10.14 y versiones anteriores).
 * **Restablecimiento de configuraciones de red** (limpia DNS, ajusta IPv6 y reinicia la interfaz de red).
 * **Liberación de memoria RAM**.
 * **Detención temporal de procesos de indexación** (`mds`, `mdworker`, `corespotlightd`) para mejorar la respuesta del sistema.
 
-### 3. Actualizar Homebrew
+### 3. Actualizar Homebrew³
 Esta opción te permite **mantener Homebrew y tus paquetes actualizados**:
 * Detecta si Homebrew está instalado en tu sistema.
 * Si lo tienes, **actualiza Homebrew y todos los paquetes instalados** a través de él, además de limpiar archivos antiguos.
@@ -71,11 +71,11 @@ Esta opcion te da informacion sobre tu sistema como el estado de la bateria, esp
 * **B. Esta opcion limpia el cache de Xcode ya que puede llegar a pesar GB
 
 ### Opciones Adicionales del Menú:
-* **Y₁. El script se autoactualiza con solo un simple click solo le tienes que picar una vez para que se actualice y reinicie en la ultima version disponible.
+* **Y. El script se autoactualiza con solo un simple click solo le tienes que picar una vez para que se actualice y reinicie en la ultima version disponible⁵.
 
 ![Captura de Pantalla 2025-06-27 a la(s) 12 14 25 a m](https://github.com/user-attachments/assets/94fe0b92-ec5a-4834-860a-d373a9a2e06d)
 
-### Revision de seguridad
+### Revision de seguridad⁴
 * **6 Esta opcion verifica si estan activos los metodos de seguridad integrados en el sistema como Firewall y Gatekeeper
 <img width="561" height="181" alt="Captura de pantalla 2025-09-12 a la(s) 6 45 42 p m" src="https://github.com/user-attachments/assets/b08359e2-c0f2-4a72-8fda-8b228abad058" />
 
@@ -104,5 +104,17 @@ Este script ha sido diseñado para ser compatible con **macOS High Sierra (10.13
 
 ---
 
-### --- NOTAS --- 
-* ₁ Necesita obligatoriamente internet para descargar la ultima version disponible en GitHub
+<details>
+<summary>NOTAS</summary>
+   
+1. La limpieza de cachés es una operación segura que elimina archivos temporales. Tras la limpieza, es posible que algunas aplicaciones tarden un poco más en abrirse por primera vez mientras regeneran dichos archivos.
+
+2. El comando para reparar permisos fue descontinuado por Apple a partir de macOS Catalina (10.15), ya que el volumen del sistema se convirtió en uno de solo lectura, protegiendo la integridad de los permisos de forma automática.
+
+3. La actualización de Homebrew se ejecuta intencionadamente con los permisos del usuario estándar (${SUDO_USER}), no como root. Esta es la práctica recomendada por Homebrew para mantener la integridad de la instalación y evitar problemas de permisos.
+
+4. Gatekeeper es una tecnología de seguridad que verifica que las apps que instalas provengan de desarrolladores identificados por Apple. El Firewall bloquea conexiones de red no deseadas. Se recomienda mantener ambos activados.
+
+5. La función de auto-actualización requiere una conexión a internet activa para poder verificar y descargar la versión más reciente del script desde el repositorio oficial en GitHub.
+
+</details>
