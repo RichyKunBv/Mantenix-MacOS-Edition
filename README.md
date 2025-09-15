@@ -71,7 +71,7 @@ Esta opcion te da informacion sobre tu sistema como el estado de la bateria, esp
 * **B. Esta opcion limpia el cache de Xcode ya que puede llegar a pesar GB
 
 ### Opciones Adicionales del Menú:
-* **Y. El script se autoactualiza con solo un simple click solo le tienes que picar una vez para que se actualice y reinicie en la ultima version disponible.
+* **Y₁. El script se autoactualiza con solo un simple click solo le tienes que picar una vez para que se actualice y reinicie en la ultima version disponible.
 
 ![Captura de Pantalla 2025-06-27 a la(s) 12 14 25 a m](https://github.com/user-attachments/assets/94fe0b92-ec5a-4834-860a-d373a9a2e06d)
 
@@ -105,4 +105,4 @@ Este script ha sido diseñado para ser compatible con **macOS High Sierra (10.13
 ---
 
 ### --- NOTAS --- 
-* Si tienes de la version Legacy (macos_mantenimiento.sh) tienes que actualizar 2 veces (Usando la funcion "Y") para tener la nueva version (MantenixM)
+* ₁ Necesita obligatoriamente internet para descargar la ultima version disponible en GitHub
