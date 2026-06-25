@@ -118,3 +118,22 @@ Este script ha sido diseñado para ser compatible con **macOS High Sierra (10.13
 5. La función de auto-actualización requiere una conexión a internet activa para poder verificar y descargar la versión más reciente del script desde el repositorio oficial en GitHub.
 
 </details>
+
+
+---
+
+<details>
+<summary>TESTS</summary>
+
+## Entornos de Prueba
+
+Este proyecto ha sido probado y verificado en las siguientes configuraciones de hardware y software:
+
+| Sistema Operativo | Arquitectura / CPU | Memoria RAM | Notas |
+| :--- | :--- | :--- | :--- |
+| macOS 27 | ARM / M1 | 16 GB | Beta macOS 27 |
+| macOS 10.13.6 | x86_64 / i7-2760QM | 10 GB | Verificacion de compatibilidad con macOS viejo |
+| macOS 15.7.7 | x86_64 / i5 (2 Puertos Thunderbolt) | 8 GB |  |
+| macos 26.5.1 | ARM / A18 Pro | 8 GB |  |
+
+</details>
