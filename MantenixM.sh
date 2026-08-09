@@ -1,12 +1,13 @@
 #!/bin/bash
 # Mantenimiento macOS
-CURRENT_VERSION="3.0.2"
+CURRENT_VERSION="3.1"
 
 # --- URLs del Repositorio ---
 REPO_URL="https://github.com/RichyKunBv/Mantenix-MacOS-Edition"
 RAW_REPO_URL="https://raw.githubusercontent.com/RichyKunBv/Mantenix-MacOS-Edition/main"
 
 SCRIPT_FILENAME="MantenixM.sh"
+SCRIPT_VERSION="version.txt"
 
 # --- Colores y Estilos ---
 GREEN='\033[1;32m'
@@ -234,6 +235,41 @@ developer_tools_cleanup() {
     clean_pkg_managers_cache
 }
 
+uninstall_vsformac() {
+echo "Desinstalando Visual Studio for Mac..."
+sudo rm -rf "/Applications/Visual Studio.app"
+rm -rf ~/Library/Caches/VisualStudio
+rm -rf ~/Library/Preferences/VisualStudio
+rm -rf ~/Library/Preferences/Visual\ Studio
+rm -rf ~/Library/Logs/VisualStudio
+rm -rf ~/Library/VisualStudio
+rm -rf ~/Library/Application\ Support/VisualStudio
+rm -rf ~/Library/Preferences/Xamarin/
+
+echo "Desinstalando componentes de Xamarin..."
+sudo rm -rf /Developer/MonoDroid
+rm -rf ~/Library/MonoAndroid
+sudo pkgutil --forget com.xamarin.android.pkg 2>/dev/null
+sudo rm -rf /Library/Frameworks/Xamarin.Android.framework
+
+rm -rf ~/Library/MonoTouch
+sudo rm -rf /Library/Frameworks/Xamarin.iOS.framework
+sudo rm -rf /Developer/MonoTouch
+sudo pkgutil --forget com.xamarin.monotouch.pkg 2>/dev/null
+sudo pkgutil --forget com.xamarin.xamarin-ios-build-host.pkg 2>/dev/null
+
+sudo rm -rf /Library/Frameworks/Xamarin.Mac.framework
+rm -rf ~/Library/Xamarin.Mac
+
+echo "Limpiando el instalador..."
+rm -rf ~/Library/Caches/XamarinInstaller/
+rm -rf ~/Library/Caches/VisualStudioInstaller/
+rm -rf ~/Library/Logs/XamarinInstaller/
+rm -rf ~/Library/Logs/VisualStudioInstaller/
+
+echo "¡Desinstalación terminada!"
+
+}
 
 # --Revisión profunda--
 show_fsck_instruction() {
@@ -534,7 +570,7 @@ check_for_updates() {
 
 
     # Intenta descargar el archivo de versión desde la URL correcta
-    REMOTE_VERSION=$(curl -sL "${RAW_REPO_URL}/version.txt")
+    REMOTE_VERSION=$(curl -sL "${RAW_REPO_URL}/${SCRIPT_VERSION}")
 
     if [ -z "$REMOTE_VERSION" ]; then
         echo -e "${RED}❌ Error: No se pudo contactar con GitHub. Revisa tu conexión.${NC}"
@@ -649,6 +685,7 @@ show_menu() {
     echo "   ----------------------------------------------------"
     echo -e "   ${CYAN}A)${NC} Ejecutar TODO el Mantenimiento"
     echo -e "   ${CYAN}B)${NC} Limpieza cache Xcode"
+    echo -e "   ${CYAN}C)${NC} Desinstalar Visual Studio for Mac"
     echo -e "   ${YELLOW}6)${NC} Revisión Rápida de Seguridad ${GREEN}${NC}"
     echo -e "   ${YELLOW}7)${NC} Limpiar cache de aplicaciones"
     echo ""
@@ -666,6 +703,7 @@ show_menu() {
         5) show_health_report ;;
         A|a) run_all_maintenance; press_any_key ;;
         B|b) clean_xcode_cache; press_any_key ;;
+        C|c) uninstall_vsformac; press_any_key ;;
         6) run_security_check; press_any_key ;;      
         7) clean_popular_apps_cache ;; 
         Y|y) check_for_updates ;;

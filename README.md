@@ -68,7 +68,10 @@ Esta opcion te da informacion sobre tu sistema como el estado de la bateria, esp
 <img width="385" height="237" alt="Captura de pantalla 2025-07-11 a la(s) 9 49 55 p m" src="https://github.com/user-attachments/assets/b30daebd-8352-42fa-9f8d-2c43ff8d4bc2" />
 
 ### 6. Limpiar cache de Xcode
-* **B. Esta opcion limpia el cache de Xcode ya que puede llegar a pesar GB
+* **B.** Esta opcion limpia el cache de Xcode ya que puede llegar a pesar GB
+
+### 7. Desinstalar Visual Studio for Mac y Xamarin
+* **C.** Esta opción desinstala completamente Visual Studio for Mac junto con todos sus componentes de Xamarin y archivos residuales del sistema.
 
 ### Opciones Adicionales del Menú:
 * **Y. El script se autoactualiza con solo un simple click solo le tienes que picar una vez para que se actualice y reinicie en la ultima version disponible⁵.

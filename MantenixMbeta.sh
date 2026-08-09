@@ -1,6 +1,10 @@
 #!/bin/bash
-# Mantenimiento macOS
-CURRENT_VERSION="3.1"
+# ==============================================================================
+# Mantenix / Mantenimiento macOS v4.0 (Edición Moderna)
+# Requisitos: macOS Big Sur (11.0) o superior
+# ==============================================================================
+
+CURRENT_VERSION="4.0"
 
 # --- URLs del Repositorio ---
 REPO_URL="https://github.com/RichyKunBv/Mantenix-MacOS-Edition"
@@ -9,17 +13,60 @@ RAW_REPO_URL="https://raw.githubusercontent.com/RichyKunBv/Mantenix-MacOS-Editio
 SCRIPT_FILENAME="MantenixMbeta.sh"
 SCRIPT_VERSION="versionBETA.txt"
 
+# --- Detección de Usuario Real (incluso bajo sudo) ---
+REAL_USER="${SUDO_USER:-$(stat -f%Su /dev/console 2>/dev/null || echo "$USER")}"
+if [[ -z "$REAL_USER" || "$REAL_USER" == "root" ]]; then
+    REAL_USER=$(logname 2>/dev/null || echo "$USER")
+fi
+REAL_HOME=$(dscl . -read /Users/"$REAL_USER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')
+if [[ -z "$REAL_HOME" || ! -d "$REAL_HOME" ]]; then
+    REAL_HOME="/Users/$REAL_USER"
+fi
+
+# --- Directorio y Archivo de Log ---
+LOG_DIR="$REAL_HOME/Library/Logs"
+LOG_FILE="$LOG_DIR/Mantenix.log"
+mkdir -p "$LOG_DIR" 2>/dev/null
+
 # --- Colores y Estilos ---
 GREEN='\033[1;32m'
 RED='\033[1;31m'
 YELLOW='\033[1;33m'
 BLUE='\033[1;34m'
 CYAN='\033[1;36m'
+BOLD='\033[1m'
 NC='\033[0m' # No Color
 
-# --- Funciones de Utilidad ---
+# Modos de Ejecución
+AUTO_MODE=false
+GUI_MODE=false
 
-# Indicador de actividad (spinner)
+# --- Logging Helpers ---
+log_msg() {
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    echo "[$timestamp] [INFO] $1" >> "$LOG_FILE" 2>/dev/null
+}
+
+log_warn() {
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    echo "[$timestamp] [WARN] $1" >> "$LOG_FILE" 2>/dev/null
+}
+
+log_err() {
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    echo "[$timestamp] [ERROR] $1" >> "$LOG_FILE" 2>/dev/null
+}
+
+# --- Notificaciones nativas del sistema ---
+notify_user() {
+    local title="$1"
+    local message="$2"
+    if [ "$GUI_MODE" = true ] || [ -z "$SSH_TTY" ]; then
+        osascript -e "display notification \"$message\" with title \"$title\"" 2>/dev/null || true
+    fi
+}
+
+# --- Indicador de Actividad (Spinner) ---
 spinner() {
     local pid=$1
     local delay=0.1
@@ -34,716 +81,677 @@ spinner() {
     printf "    \r"
 }
 
-# Pausa interactiva
+# --- Pausa Interactiva ---
 press_any_key() {
-    echo -e "\n${YELLOW}Pulsa cualquier tecla para volver al menú...${NC}"
+    if [ "$AUTO_MODE" = true ]; then
+        return
+    fi
+    echo -e "\n${YELLOW}Pulsa cualquier tecla para continuar...${NC}"
     read -n 1 -s -r
 }
 
-# Solicitar permisos de administrador si no los tiene
+# --- Verificación de Permisos Sudo ---
 check_sudo() {
     if [[ $EUID -ne 0 ]]; then
-        echo -e "${RED}Este script requiere permisos de administrador.${NC}"
-        exec sudo -p "Por favor, introduce tu contraseña para continuar: " "$0" "$@"
+        echo -e "${RED}Este script requiere permisos de administrador para ejecutar tareas del sistema.${NC}"
+        log_warn "Solicitando permisos de sudo..."
+        exec sudo -p "Por favor, introduce tu contraseña de administrador para continuar: " "$0" "$@"
     fi
 }
 
-# --- Funciones de Detección de Sistema ---
-
-# Obtener versión completa de macOS (ej: 10.15.7)
-get_macos_version_full() {
-    sw_vers -productVersion
-}
-
-# Obtener versión mayor de macOS (ej: 10 o 11)
-get_macos_major_version() {
-    sw_vers -productVersion | cut -d '.' -f 1
-}
-
-# Obtener versión menor de macOS (ej: 15 para 10.15)
-get_macos_version() {
-    sw_vers -productVersion | cut -d '.' -f 2
-}
-
-# Comprobar si la versión actual es al menos la requerida
-is_at_least_version() {
-    local required=$1
-    local current=$(get_macos_version_full)
-    if [[ $(echo "$current $required" | tr ' ' '\n' | sort -V | head -n1) == "$required" ]]; then
-        return 0 # true, es al menos esta versión
-    else
-        return 1 # false, es menor que esta versión
-    fi
-}
-
-# Obtener la arquitectura de CPU (Intel o Apple Silicon)
-get_cpu_architecture() {
-    if [ "$(uname -m)" = "arm64" ]; then
-        echo "apple_silicon"
-    else
-        echo "intel"
-    fi
-}
-
-# Obtener la ruta del volumen de sistema según la versión de macOS
-get_system_volume_path() {
-    local major_ver=$(get_macos_major_version)
-    local minor_ver=$(get_macos_version)
+# --- Verificación de Compatibilidad (macOS 11.0+) ---
+check_compatibility() {
+    local os_version=$(sw_vers -productVersion)
+    local major_ver=$(echo "$os_version" | cut -d '.' -f 1)
     
-    if [[ "$major_ver" -ge 11 ]]; then
-        echo "/System/Volumes/Data"
-    elif [[ "$major_ver" -eq 10 && "$minor_ver" -ge 15 ]]; then
-        echo "/System/Volumes/Data"
-    else
-        echo "/"
-    fi
-}
+    log_msg "Compatibilidad comprobada: macOS $os_version (Mayor: $major_ver)"
 
-# Verificar disponibilidad de una herramienta
-check_tool_availability() {
-    local tool=$1
-    if command -v "$tool" &>/dev/null; then
-        return 0 # true, herramienta disponible
-    else
-        return 1 # false, herramienta no disponible
+    if [[ "$major_ver" -lt 11 ]]; then
+        echo -e "${RED}❌ Error: Mantenix v4.0 requiere macOS Big Sur (11.0) o posterior.${NC}"
+        echo -e "${YELLOW}Tu versión actual ($os_version) ya no es compatible con la versión 4.0.${NC}"
+        log_err "Sistema incompatible: macOS $os_version"
+        exit 1
     fi
-}
 
-# Verificar estado de SIP (System Integrity Protection)
-check_sip_status() {
+    # Comprobación de SIP
     if csrutil status | grep -q "enabled"; then
-        echo -e "${YELLOW}SIP está activado. Algunas operaciones pueden estar restringidas.${NC}"
-        return 0 # SIP activado
+        log_msg "SIP está activado."
     else
-        return 1 # SIP desactivado
+        log_warn "SIP está desactivado."
     fi
 }
 
+# --- Instantánea de Time Machine (Rollback Safety) ---
+create_tm_snapshot() {
+    echo -e "${CYAN}--- Instantánea de Seguridad de Time Machine ---${NC}"
+    log_msg "Iniciando creación de instantánea local APFS..."
+    
+    if [ "$AUTO_MODE" = false ]; then
+        read -p "¿Deseas crear una instantánea local de Time Machine antes de realizar cambios? (S/n): " confirm
+        if [[ "$confirm" == "n" || "$confirm" == "N" ]]; then
+            echo -e "${YELLOW}Omitiendo creación de instantánea.${NC}"
+            log_msg "Creación de instantánea omitida por el usuario."
+            return
+        fi
+    fi
 
-# --- Comandos ---
+    echo -n -e "${BLUE}Creando instantánea local de APFS...${NC}"
+    tmutil localsnapshot / &>/dev/null &
+    spinner $!
+    echo -e "${GREEN}✅ Instantánea de seguridad creada correctamente.${NC}"
+    log_msg "Instantánea local APFS creada con éxito."
+    notify_user "Mantenix v4.0" "Instantánea de seguridad creada correctamente."
+    sleep 1
+}
+
+# --- Tareas de Limpieza ---
+
+clean_caches_and_temp() {
+    echo -e "${YELLOW}--- Limpiando cachés de usuario, sistema y temporales ---${NC}"
+    log_msg "Iniciando limpieza de cachés y temporales..."
+
+    # Limpieza de usuario real
+    echo -e "${BLUE}Limpiando cachés del usuario ($REAL_USER)...${NC}"
+    rm -rf "$REAL_HOME/Library/Caches/"* "$REAL_HOME/Library/Logs/"* "$REAL_HOME/Library/Saved Application State/"* 2>/dev/null
+    log_msg "Cachés de usuario en $REAL_HOME/Library/Caches borrados."
+
+    # Limpieza de sistema
+    echo -e "${BLUE}Limpiando cachés de /Library/Caches...${NC}"
+    sudo rm -rf /Library/Caches/* 2>/dev/null
+    sudo rm -rf /private/var/log/* 2>/dev/null
+
+    # Limpieza segura de /private/var/folders (solo Caches y TemporaryItems)
+    echo -e "${BLUE}Limpiando subdirectorios de Caches y TemporaryItems en /private/var/folders...${NC}"
+    sudo find /private/var/folders -type d \( -name "Caches" -o -name "TemporaryItems" \) -exec rm -rf {} + 2>/dev/null || true
+    sudo rm -rf /private/var/tmp/* 2>/dev/null
+
+    echo -e "${GREEN}✅ Limpieza de cachés finalizada.${NC}"
+    log_msg "Limpieza de cachés completada."
+    sleep 1
+}
+
+clean_icons_and_spotlight() {
+    echo -e "${YELLOW}--- Limpieza de cachés de iconos y reindexación de Spotlight ---${NC}"
+    log_msg "Iniciando reindexación de Spotlight y limpieza de iconos..."
+
+    echo -e "${BLUE}Eliminando cachés de iconos y metadatos...${NC}"
+    sudo find /private/var/folders -name "com.apple.iconservices*" -exec rm -rf {} + 2>/dev/null || true
+    sudo find /private/var/folders -name "com.apple.metadata*" -exec rm -rf {} + 2>/dev/null || true
+
+    echo -e "${BLUE}Reiniciando e reindexando Spotlight (/System/Volumes/Data)...${NC}"
+    sudo mdutil -i off / &>/dev/null
+    sudo mdutil -E /System/Volumes/Data &>/dev/null
+    sudo mdutil -i on / &>/dev/null
+
+    echo -e "${GREEN}✅ Reindexación de Spotlight activada.${NC}"
+    log_msg "Spotlight reindexado con éxito."
+    sleep 1
+}
+
+clean_swap_files() {
+    echo -e "${YELLOW}--- Limpieza de archivos Swap (Memoria Virtual) ---${NC}"
+    log_msg "Iniciando verificación de Swap..."
+
+    local swap_count=$(ls /private/var/vm/swapfile* 2>/dev/null | wc -l)
+    if [ "$swap_count" -eq 0 ]; then
+        echo -e "${BLUE}ℹ️ No se detectaron archivos de intercambio swap para eliminar.${NC}"
+        log_msg "Sin archivos swap pendientes."
+        return
+    fi
+
+    echo -e "${RED}⚠️  Atención: Se eliminarán los archivos swap inactivos.${NC}"
+    if [ "$AUTO_MODE" = false ]; then
+        read -p "¿Deseas continuar con la eliminación de swap? (s/N): " confirm
+        if [[ "$confirm" != "s" && "$confirm" != "S" ]]; then
+            echo -e "${YELLOW}Operación cancelada.${NC}"
+            log_msg "Limpieza de Swap cancelada."
+            return
+        fi
+    fi
+
+    echo -e "${BLUE}Eliminando archivos swap...${NC}"
+    sudo rm -f /private/var/vm/swapfile* 2>/dev/null
+    echo -e "${GREEN}✅ Archivos swap eliminados.${NC}"
+    log_msg "Swap eliminado con éxito."
+    sleep 1
+}
+
+# --- Tareas de Mantenimiento de Sistema ---
 
 perform_disk_check() {
-    echo -e "${YELLOW}--- Verificando y reparando el volumen principal ---${NC}"
-    
-    # Usar la nueva función de detección de versión
-    if is_at_least_version "10.13"; then
-        echo -e "${BLUE}Ejecutando diskutil verifyVolume / (macOS 10.13+)...${NC}"
-        diskutil verifyVolume / || echo -e "${RED}Error al verificar el volumen.${NC}"
-        echo -e "${BLUE}Ejecutando diskutil repairVolume / (macOS 10.13+)...${NC}"
-        diskutil repairVolume / || echo -e "${RED}Error al reparar el volumen.${NC}"
-    else
-        echo -e "${BLUE}Ejecutando diskutil verifyDisk disk0 (macOS anterior a 10.13)...${NC}"
-        diskutil verifyDisk disk0 || echo -e "${RED}Error al verificar el disco.${NC}"
-        echo -e "${BLUE}Ejecutando diskutil repairDisk disk0 (macOS anterior a 10.13)...${NC}"
-        diskutil repairDisk disk0 || echo -e "${RED}Error al reparar el disco.${NC}"
-    fi
-    echo -e "${GREEN}Verificación/Reparación de disco completada.${NC}"
-    sleep 2
-}
+    echo -e "${YELLOW}--- Verificación del Volumen de Sistema (APFS) ---${NC}"
+    log_msg "Iniciando verificación de volumen diskutil..."
 
-repair_permissions_legacy() {
-    echo -e "${YELLOW}--- Reparando permisos del sistema (Solo macOS Mojave y anteriores) ---${NC}"
-    
-    # Usar la nueva función de detección de versión
-    if ! is_at_least_version "10.15"; then
-        echo -e "${BLUE}Ejecutando diskutil repairPermissions /...${NC}"
-        diskutil repairPermissions / || echo -e "${RED}Error al reparar permisos.${NC}"
-        echo -e "${GREEN}Reparación de permisos completada.${NC}"
+    echo -e "${BLUE}Ejecutando diskutil verifyVolume /...${NC}"
+    if diskutil verifyVolume /; then
+        echo -e "${GREEN}✅ El volumen de sistema no presenta errores.${NC}"
+        log_msg "Verificación de disco: OK"
     else
-        echo -e "${YELLOW}La reparación de permisos no es necesaria en macOS 10.15 (Catalina) o superior.${NC}"
+        echo -e "${RED}⚠️ Se encontraron posibles inconsistencias en el disco.${NC}"
+        echo -e "${YELLOW}Recomendación: Reinicia en Modo de Recuperación (CMD+R o Mantener Botón de Encendido en Apple Silicon) y ejecuta Utilidad de Discos / First Aid.${NC}"
+        log_warn "Verificación de disco encontró errores."
     fi
     sleep 2
 }
 
 reset_network_settings() {
-    echo -e "${YELLOW}--- Restableciendo configuraciones de red ---${NC}"
-    echo -e "${BLUE}Limpiando caché de DNS...${NC}"
+    echo -e "${YELLOW}--- Restableciendo servicios y caché de red ---${NC}"
+    log_msg "Restableciendo red y DNS..."
+
+    echo -e "${BLUE}Limpiando caché DNS (dscacheutil / mDNSResponder)...${NC}"
     dscacheutil -flushcache
-    killall -HUP mDNSResponder
-    echo -e "${BLUE}Configurando IPv6 en Wi-Fi (desactivando y activando)...${NC}"
-    networksetup -setv6off Wi-Fi 2>/dev/null
-    networksetup -setv6automatic Wi-Fi 2>/dev/null
-    echo -e "${BLUE}Reiniciando interfaz de red (en0)...${NC}"
-    ifconfig en0 down 2>/dev/null
-    ifconfig en0 up 2>/dev/null
-    echo -e "${GREEN}Restablecimiento de red completado.${NC}"
-    sleep 2
+    killall -HUP mDNSResponder 2>/dev/null || true
+
+    echo -e "${BLUE}Restableciendo stack IPv6 en interfaz Wi-Fi...${NC}"
+    networksetup -setv6off Wi-Fi 2>/dev/null || true
+    networksetup -setv6automatic Wi-Fi 2>/dev/null || true
+
+    echo -e "${GREEN}✅ Configuración de red restablecida.${NC}"
+    log_msg "Red restablecida con éxito."
+    sleep 1
 }
 
 free_ram() {
-    echo -e "${YELLOW}--- Liberando memoria RAM ---${NC}"
-    echo -e "${BLUE}Ejecutando sudo purge...${NC}"
+    echo -e "${YELLOW}--- Liberación de Memoria RAM ---${NC}"
+    log_msg "Ejecutando purge de RAM..."
+    echo -e "${BLUE}Ejecutando purge del sistema...${NC}"
     sudo purge
-    echo -e "${GREEN}Memoria RAM liberada.${NC}"
+    echo -e "${GREEN}✅ Memoria inactiva liberada.${NC}"
+    log_msg "Purge de RAM ejecutado."
+    sleep 1
+}
+
+# --- Gestores de Paquetes y Herramientas ---
+
+detect_homebrew() {
+    if [ -x "/opt/homebrew/bin/brew" ]; then
+        echo "/opt/homebrew/bin/brew"
+    elif [ -x "/usr/local/bin/brew" ]; then
+        echo "/usr/local/bin/brew"
+    elif command -v brew &>/dev/null; then
+        command -v brew
+    else
+        return 1
+    fi
+}
+
+update_homebrew() {
+    echo -e "${YELLOW}--- Mantenimiento y Actualización de Homebrew ---${NC}"
+    log_msg "Iniciando comprobación de Homebrew..."
+
+    local brew_path=$(detect_homebrew)
+    if [ -z "$brew_path" ]; then
+        echo -e "${BLUE}ℹ️ Homebrew no está instalado en el sistema.${NC}"
+        log_msg "Homebrew no instalado."
+        return
+    fi
+
+    echo -e "${BLUE}🔍 Homebrew hallado en: $brew_path${NC}"
+    echo -e "${BLUE}Ejecutando actualización como usuario '$REAL_USER'...${NC}"
+
+    sudo -u "$REAL_USER" bash <<BREW_CMD
+        "$brew_path" update
+        "$brew_path" upgrade
+        "$brew_path" upgrade --cask --greedy 2>/dev/null || true
+        "$brew_path" cleanup -s
+        "$brew_path" doctor || true
+BREW_CMD
+
+    echo -e "${GREEN}✅ Homebrew actualizado y optimizado.${NC}"
+    log_msg "Homebrew actualizado con éxito."
     sleep 2
 }
 
-stop_indexing_processes() {
-    echo -e "${YELLOW}--- Deteniendo procesos de indexación momentáneamente ---${NC}"
-    echo -e "${BLUE}Deteniendo mds, mdworker y corespotlightd...${NC}"
-    sudo pkill -f "mds"
-    sudo pkill -f "mdworker"
-    sudo pkill -f "corespotlightd"
-    echo -e "${GREEN}Procesos de indexación detenidos.${NC}"
-    sleep 2
+clean_pkg_managers_cache() {
+    echo -e "${CYAN}--- Limpieza de Caché de Gestores de Paquetes (npm, pip) ---${NC}"
+    log_msg "Limpiando gestores de paquetes..."
+    local count=0
+
+    if sudo -u "$REAL_USER" command -v npm &>/dev/null; then
+        echo -n -e "${BLUE}Limpiando caché de npm...${NC}"
+        sudo -u "$REAL_USER" npm cache clean --force &>/dev/null &
+        spinner $!
+        echo -e "${GREEN}✅ npm limpiado.${NC}"
+        ((count++))
+    fi
+
+    if sudo -u "$REAL_USER" command -v pip &>/dev/null || sudo -u "$REAL_USER" command -v pip3 &>/dev/null; then
+        echo -n -e "${BLUE}Limpiando caché de pip...${NC}"
+        sudo -u "$REAL_USER" python3 -m pip cache purge &>/dev/null &
+        spinner $!
+        echo -e "${GREEN}✅ pip limpiado.${NC}"
+        ((count++))
+    fi
+
+    if [ $count -eq 0 ]; then
+        echo -e "${BLUE}ℹ️ No se detectaron npm ni pip instalados.${NC}"
+    fi
 }
 
-
-# --Limpieza cache Xcode--
 clean_xcode_cache() {
-    local XCODE_CACHE_PATH="$HOME/Library/Developer/Xcode/DerivedData"
-        if [ -d "$XCODE_CACHE_PATH" ] && [ "$(ls -A $XCODE_CACHE_PATH)" ]; then
-        echo -e "${YELLOW}Se detectó caché de Xcode (${CYAN}DerivedData${YELLOW}).${NC}"
-        read -p "   ¿Deseas limpiarlo? (puede tardar en regenerarse) (S/n): " choice
-        if [[ -z "$choice" || "$choice" == "s" || "$choice" == "S" ]]; then
-            echo -n -e "${BLUE}Limpiando caché de Xcode...${NC}"
-            rm -rf "$XCODE_CACHE_PATH"/* &
-            spinner $!
-            echo -e "${GREEN}✅ Caché de Xcode limpiado.${NC}"
-        else
-            echo -e "${YELLOW}Omitiendo limpieza de Xcode.${NC}"
+    echo -e "${CYAN}--- Limpieza de Caché de Xcode (DerivedData) ---${NC}"
+    local xcode_path="$REAL_HOME/Library/Developer/Xcode/DerivedData"
+    if [ -d "$xcode_path" ] && [ "$(ls -A "$xcode_path" 2>/dev/null)" ]; then
+        echo -e "${YELLOW}Se detectó caché de Xcode (DerivedData).${NC}"
+        if [ "$AUTO_MODE" = false ]; then
+            read -p "   ¿Deseas limpiarlo? (S/n): " choice
+            if [[ "$choice" == "n" || "$choice" == "N" ]]; then
+                echo -e "${YELLOW}Omitiendo limpieza de Xcode.${NC}"
+                return
+            fi
         fi
+        echo -n -e "${BLUE}Limpiando caché de Xcode...${NC}"
+        rm -rf "$xcode_path"/* &
+        spinner $!
+        echo -e "${GREEN}✅ Caché de Xcode limpiado.${NC}"
+        log_msg "Xcode DerivedData eliminado."
     else
         echo -e "${BLUE}ℹ️ No se encontró caché de Xcode para limpiar.${NC}"
     fi
 }
-clean_pkg_managers_cache() {
-    echo -e "${YELLOW}--- Buscando cachés de gestores de paquetes ---${NC}"
-    local cleaned_something=false
-    if command -v npm &>/dev/null; then
-        echo -n -e "${BLUE}Limpiando caché de npm...${NC}"
-        npm cache clean --force &>/dev/null &
-        spinner $!
-        echo -e "${GREEN}✅ Caché de npm limpiado.${NC}"
-        cleaned_something=true
-    fi
-    if command -v pip &>/dev/null; then
-        echo -n -e "${BLUE}Limpiando caché de pip...${NC}"
-        pip cache purge &>/dev/null &
-        spinner $!
-        echo -e "${GREEN}✅ Caché de pip limpiado.${NC}"
-        cleaned_something=true
-    fi
-    if ! $cleaned_something; then
-        echo -e "${BLUE}ℹ️ No se encontraron gestores de paquetes (npm, pip) para limpiar.${NC}"
-    fi
-}
-developer_tools_cleanup() {
-    echo -e "${CYAN}--- Limpieza de Herramientas de Desarrollo ---${NC}"
-    clean_xcode_cache
-    echo ""
-    clean_pkg_managers_cache
-}
 
 uninstall_vsformac() {
-echo "Desinstalando Visual Studio for Mac..."
-sudo rm -rf "/Applications/Visual Studio.app"
-rm -rf ~/Library/Caches/VisualStudio
-rm -rf ~/Library/Preferences/VisualStudio
-rm -rf ~/Library/Preferences/Visual\ Studio
-rm -rf ~/Library/Logs/VisualStudio
-rm -rf ~/Library/VisualStudio
-rm -rf ~/Library/Application\ Support/VisualStudio
-rm -rf ~/Library/Preferences/Xamarin/
+    echo -e "${YELLOW}--- Desinstalando Visual Studio for Mac ---${NC}"
+    log_msg "Iniciando desinstalación de Visual Studio for Mac..."
 
-echo "Desinstalando componentes de Xamarin..."
-sudo rm -rf /Developer/MonoDroid
-rm -rf ~/Library/MonoAndroid
-sudo pkgutil --forget com.xamarin.android.pkg 2>/dev/null
-sudo rm -rf /Library/Frameworks/Xamarin.Android.framework
+    sudo rm -rf "/Applications/Visual Studio.app"
+    rm -rf "$REAL_HOME/Library/Caches/VisualStudio"
+    rm -rf "$REAL_HOME/Library/Preferences/VisualStudio"
+    rm -rf "$REAL_HOME/Library/Preferences/Visual Studio"
+    rm -rf "$REAL_HOME/Library/Logs/VisualStudio"
+    rm -rf "$REAL_HOME/Library/VisualStudio"
+    rm -rf "$REAL_HOME/Library/Application Support/VisualStudio"
+    rm -rf "$REAL_HOME/Library/Preferences/Xamarin/"
 
-rm -rf ~/Library/MonoTouch
-sudo rm -rf /Library/Frameworks/Xamarin.iOS.framework
-sudo rm -rf /Developer/MonoTouch
-sudo pkgutil --forget com.xamarin.monotouch.pkg 2>/dev/null
-sudo pkgutil --forget com.xamarin.xamarin-ios-build-host.pkg 2>/dev/null
+    echo -e "${BLUE}Desinstalando componentes de Xamarin...${NC}"
+    sudo rm -rf /Developer/MonoDroid
+    rm -rf "$REAL_HOME/Library/MonoAndroid"
+    sudo pkgutil --forget com.xamarin.android.pkg 2>/dev/null || true
+    sudo rm -rf /Library/Frameworks/Xamarin.Android.framework
 
-sudo rm -rf /Library/Frameworks/Xamarin.Mac.framework
-rm -rf ~/Library/Xamarin.Mac
+    rm -rf "$REAL_HOME/Library/MonoTouch"
+    sudo rm -rf /Library/Frameworks/Xamarin.iOS.framework
+    sudo rm -rf /Developer/MonoTouch
+    sudo pkgutil --forget com.xamarin.monotouch.pkg 2>/dev/null || true
+    sudo pkgutil --forget com.xamarin.xamarin-ios-build-host.pkg 2>/dev/null || true
 
-echo "Limpiando el instalador..."
-rm -rf ~/Library/Caches/XamarinInstaller/
-rm -rf ~/Library/Caches/VisualStudioInstaller/
-rm -rf ~/Library/Logs/XamarinInstaller/
-rm -rf ~/Library/Logs/VisualStudioInstaller/
+    sudo rm -rf /Library/Frameworks/Xamarin.Mac.framework
+    rm -rf "$REAL_HOME/Library/Xamarin.Mac"
 
-echo "¡Desinstalación terminada!"
+    echo -e "${BLUE}Limpiando el instalador...${NC}"
+    rm -rf "$REAL_HOME/Library/Caches/XamarinInstaller/"
+    rm -rf "$REAL_HOME/Library/Caches/VisualStudioInstaller/"
+    rm -rf "$REAL_HOME/Library/Logs/XamarinInstaller/"
+    rm -rf "$REAL_HOME/Library/Logs/VisualStudioInstaller/"
 
-}
-
-# --Revisión profunda--
-show_fsck_instruction() {
-    echo -e "${YELLOW}--- Instrucción para fsck en modo de recuperación ---${NC}"
-    echo -e "${BLUE}Para verificar y reparar el sistema de archivos de manera más profunda, reinicia tu Mac en ${RED}modo de recuperación${NC} (manteniendo Command + R al iniciar) y luego ejecuta la siguiente línea en la Terminal:${NC}"
-    echo -e "${GREEN}'/sbin/fsck -fy'${NC}"
-    echo ""
-    echo -e "${YELLOW}Pulsa cualquier tecla para volver al menú...${NC}"
-    read -n 1 -s
-}
-
-clean_caches_and_temp() {
-    echo -e "${YELLOW}--- Limpiando cachés del sistema, usuario y archivos temporales ---${NC}"
-    
-    # Verificar si tenemos permisos para acceder a ciertas ubicaciones
-    if is_at_least_version "10.14"; then
-        echo -e "${BLUE}Nota: En macOS Mojave y posteriores, es posible que necesites otorgar permisos de acceso completo al disco a Terminal.${NC}"
-    fi
-    
-    # Obtener la ruta correcta del volumen de datos según la versión de macOS
-    local data_volume_path=$(get_system_volume_path)
-    
-    echo -e "${BLUE}Eliminando cachés de usuario, logs y estados de aplicaciones guardados...${NC}"
-    rm -rf ~/Library/Caches/* ~/Library/Logs/* ~/Library/Saved\ Application\ State/* 2>/dev/null
-    
-    echo -e "${BLUE}Eliminando cachés del sistema...${NC}"
-    if check_sip_status; then
-        echo -e "${YELLOW}SIP está activado. Algunas operaciones de limpieza pueden estar limitadas.${NC}"
-        sudo rm -rf /Library/Caches/* 2>/dev/null
-        # No intentamos limpiar /System/Library/Caches cuando SIP está activado
-    else
-        sudo rm -rf /Library/Caches/* /System/Library/Caches/* 2>/dev/null
-    fi
-    
-    sudo rm -rf /private/var/log/* 2>/dev/null
-    
-    echo -e "${BLUE}Eliminando archivos temporales en /private/var/tmp y /private/var/folders...${NC}"
-    sudo rm -rf /private/var/tmp/* /private/var/folders/* 2>/dev/null
-    
-    echo -e "${GREEN}Limpieza de cachés y temporales completada.${NC}"
-    sleep 2
-}
-
-clean_icons_and_spotlight() {
-    echo -e "${YELLOW}--- Limpiando caché de iconos y reconstruyendo índice de Spotlight ---${NC}"
-    
-    # Verificar si tenemos las herramientas necesarias
-    if ! check_tool_availability "mdutil"; then
-        echo -e "${RED}Error: La herramienta mdutil no está disponible en este sistema.${NC}"
-        echo -e "${YELLOW}Omitiendo reconstrucción de índice de Spotlight.${NC}"
-        return
-    fi
-    
-    # Obtener la ruta correcta del volumen de datos según la versión de macOS
-    local data_volume_path=$(get_system_volume_path)
-    
-    echo -e "${BLUE}Eliminando caché de iconos...${NC}"
-    if is_at_least_version "10.15"; then
-        # En Catalina y posteriores, la ubicación puede ser diferente
-        sudo find /private/var/folders -name "com.apple.iconservices*" -exec rm -rf {} \; 2>/dev/null
-        if [ "$(get_cpu_architecture)" = "apple_silicon" ]; then
-            # Ubicación específica para Apple Silicon
-            sudo find /System/Volumes/Data/private/var/folders -name "com.apple.iconservices*" -exec rm -rf {} \; 2>/dev/null
-        fi
-    else
-        # Para versiones anteriores
-        sudo find /private/var/folders -name "com.apple.iconservices" -exec rm -rf {} + 2>/dev/null
-    fi
-    
-    echo -e "${BLUE}Eliminando caché de metadatos...${NC}"
-    sudo find /private/var/folders -name "com.apple.metadata*" -exec rm -rf {} \; 2>/dev/null
-    
-    echo -e "${BLUE}Eliminando caché de Spotlight y reconstruyendo índice...${NC}"
-    sudo rm -rf ~/.Spotlight-V100 2>/dev/null
-    
-    # Reconstruir el índice de Spotlight en la ubicación correcta
-    if is_at_least_version "10.15"; then
-        echo -e "${BLUE}Reconstruyendo índice de Spotlight para macOS Catalina o superior...${NC}"
-        sudo mdutil -i off / && sudo mdutil -i on /
-        sudo mdutil -E $data_volume_path
-    else
-        echo -e "${BLUE}Reconstruyendo índice de Spotlight para macOS Mojave o anterior...${NC}"
-        sudo mdutil -E /
-    fi
-    
-    echo -e "${GREEN}Limpieza de iconos y Spotlight completada.${NC}"
-    sleep 2
-}
-
-clean_swap_files() {
-    echo -e "${YELLOW}--- Limpiando archivos de intercambio (Swap) ---${NC}"
-    echo -e "${RED}¡Atención! Esta acción puede afectar la estabilidad del sistema si la memoria SWAP está en uso intensivo.${NC}"
-    read -p "¿Deseas continuar? (s/N): " confirm
-    if [[ "$confirm" == "s" || "$confirm" == "S" ]]; then
-        echo -e "${BLUE}Eliminando archivos de intercambio...${NC}"
-        sudo rm -f /private/var/vm/swapfile*
-        echo -e "${GREEN}Archivos de intercambio eliminados.${NC}"
-    else
-        echo -e "${YELLOW}Operación de limpieza de SWAP cancelada.${NC}"
-    fi
-    sleep 2
+    echo -e "${GREEN}¡Desinstalación terminada!${NC}"
+    log_msg "Desinstalación de Visual Studio for Mac completada."
 }
 
 
-# --- Indices ---
-
-# -- Limpieza General --    --
-group_clean_all() {
-    echo -e "${BLUE}--- Ejecutando todas las tareas de limpieza ---${NC}"
-    clean_caches_and_temp
-    clean_icons_and_spotlight
-    clean_swap_files # Esta función pide confirmación
-    echo -e "${GREEN}Todas las tareas de limpieza completadas.${NC}"
-    sleep 2
-}
-
-
-# --Mantenimiento del Sistema--
-group_system_maintenance() {
-    echo -e "${BLUE}--- Ejecutando tareas de mantenimiento del sistema ---${NC}"
-    perform_disk_check
-    repair_permissions_legacy
-    reset_network_settings
-    free_ram
-    stop_indexing_processes
-    echo -e "${GREEN}Todas las tareas de mantenimiento del sistema completadas.${NC}"
-    echo -e "${YELLOW}Se recomienda revisar la instrucción para fsck para un mantenimiento más profundo.${NC}"
-    sleep 2
-}
-
-
-# --Actualizar Homebrew--
-detect_homebrew() {
-    local arch=$(get_cpu_architecture)
-    if [ "$arch" = "apple_silicon" ]; then
-        if [ -x "/opt/homebrew/bin/brew" ]; then
-            echo "/opt/homebrew/bin/brew"
-            return 0
-        fi
-    else
-        if [ -x "/usr/local/bin/brew" ]; then
-            echo "/usr/local/bin/brew"
-            return 0
-        fi
-    fi
-    
-    # Búsqueda en rutas adicionales
-    local BREW_PATHS=("$HOME/.linuxbrew/bin/brew" "$HOME/.homebrew/bin/brew")
-    for path in "${BREW_PATHS[@]}"; do
-        if [[ -x "$path" ]]; then
-            echo "$path"
-            return 0
-        fi
-    done
-    
-    # Búsqueda en PATH
-    if command -v brew &>/dev/null; then
-        echo "$(command -v brew)"
-        return 0
-    fi
-    
-    return 1 # No encontrado
-}
-
-update_homebrew() {
-    echo -e "${YELLOW}--- Actualización de Homebrew ---${NC}"
-
-    # Usar la nueva función de detección
-    local brew_path=$(detect_homebrew)
-    if [ -z "$brew_path" ]; then
-        echo -e "${RED}❌ Homebrew no está instalado.${NC}"
-        echo -e "${YELLOW}Para instalarlo, ejecuta este comando en tu terminal:${NC}"
-        echo -e "${BLUE}/bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"${NC}"
-        sleep 3
-        return
-    fi
-    
-    echo -e "${BLUE}🔍 Homebrew detectado en: $brew_path${NC}"
-
-    # Obtener usuario original (no root)
-    ORIGINAL_USER="${SUDO_USER:-$(logname 2>/dev/null || echo "$USER")}"
-
-    if [[ -z "$ORIGINAL_USER" || "$ORIGINAL_USER" == "root" ]]; then
-        echo -e "${RED}❌ Error: No se pudo obtener el usuario no-root.${NC}"
-        echo -e "${YELLOW}Ejecuta el script sin 'sudo' para actualizar Homebrew.${NC}"
-        sleep 3
-        return
-    fi
-
-    echo -e "${BLUE}🔄 Actualizando Homebrew como usuario '$ORIGINAL_USER'...${NC}"
-
-    # Comandos para actualizar usando la ruta específica de brew
-    sudo -u "$ORIGINAL_USER" bash <<BREW_UPDATE
-        # Cargar entorno del usuario
-        [[ -f ~/.bash_profile ]] && source ~/.bash_profile
-        [[ -f ~/.zshrc ]] && source ~/.zshrc
-
-        # Usar la ruta específica de brew detectada
-        BREW_PATH="$brew_path"
-        echo "Usando Homebrew en: \$BREW_PATH"
-        
-        # Actualizar todo
-        \$BREW_PATH update
-        \$BREW_PATH upgrade
-        \$BREW_PATH upgrade --cask
-        \$BREW_PATH cleanup
-        \$BREW_PATH doctor
-BREW_UPDATE
-
-    echo -e "${GREEN}✅ Homebrew y todos los paquetes actualizados correctamente.${NC}"
-    sleep 3
-}
-
-
-#--- Limpieza de Cachés de Apps Populares ---
 clean_popular_apps_cache() {
     echo -e "${CYAN}--- Limpieza de Cachés de Aplicaciones Populares ---${NC}"
-    local cleaned_something=false
+    log_msg "Limpiando cachés de aplicaciones populares..."
 
-    # --- Spotify ---
-    # Define la ruta del caché de Spotify
-    local SPOTIFY_CACHE_PATH="$HOME/Library/Application Support/Spotify/PersistentCache"
-    
-    # Verifica si el directorio existe y no está vacío
-    if [ -d "$SPOTIFY_CACHE_PATH" ] && [ "$(ls -A "$SPOTIFY_CACHE_PATH")" ]; then
-        echo -e "${YELLOW}Se detectó caché de Spotify.${NC}"
-        read -p "   ¿Deseas limpiarlo? (S/n): " choice
-        if [[ -z "$choice" || "$choice" == "s" || "$choice" == "S" ]]; then
-            echo -n -e "${BLUE}Limpiando caché de Spotify...${NC}"
-            rm -rf "$SPOTIFY_CACHE_PATH"/* &
-            spinner $!
-            echo -e "${GREEN}✅ Caché de Spotify limpiado.${NC}"
-            cleaned_something=true
-        else
-            echo -e "${YELLOW}Omitiendo limpieza de Spotify.${NC}"
+    declare -A APPS=(
+        ["Spotify"]="$REAL_HOME/Library/Application Support/Spotify/PersistentCache"
+        ["Google Chrome"]="$REAL_HOME/Library/Caches/Google/Chrome"
+        ["Firefox"]="$REAL_HOME/Library/Caches/Firefox"
+        ["Microsoft Edge"]="$REAL_HOME/Library/Caches/Microsoft Edge"
+        ["Slack"]="$REAL_HOME/Library/Caches/com.tinyspeck.slackmacgap"
+        ["VS Code"]="$REAL_HOME/Library/Caches/com.microsoft.VSCode"
+    )
+
+    local cleaned=0
+    for app in "${!APPS[@]}"; do
+        local path="${APPS[$app]}"
+        if [ -d "$path" ] && [ "$(ls -A "$path" 2>/dev/null)" ]; then
+            echo -e "${BLUE}Limpiando caché de $app...${NC}"
+            rm -rf "$path"/* 2>/dev/null || true
+            echo -e "${GREEN}  ✅ $app limpiado.${NC}"
+            log_msg "Caché de $app limpiado."
+            ((cleaned++))
         fi
-        echo "" 
-    fi
+    done
 
-    # --- Steam (placeholder para el futuro) ---
-    # Puedes añadir la lógica para Steam aquí de la misma forma
-
-    # Si no se encontró nada para limpiar, informa al usuario
-    if ! $cleaned_something; then
-        echo -e "${BLUE}ℹ️ No se encontraron cachés de apps populares (Spotify, etc.) para limpiar.${NC}"
+    if [ $cleaned -eq 0 ]; then
+        echo -e "${BLUE}ℹ️ No se encontraron cachés de aplicaciones para limpiar.${NC}"
     fi
 }
 
-#--- Revisión de Seguridad Rápida ---
-run_security_check() {
-    echo -e "${CYAN}--- Revisión Rápida de Seguridad ---${NC}"
+# --- Revisión de Seguridad v4.0 ---
 
-    # 1. Revisar Firewall de macOS
-    echo -e "${BLUE}Revisando estado del Firewall...${NC}"
-    if [[ $(defaults read /Library/Preferences/com.apple.alf globalstate) -eq 0 ]]; then
-        echo -e "${RED}⚠️  ALERTA: El Firewall de macOS está DESACTIVADO.${NC}"
-        read -p "   ¿Deseas activarlo ahora para mayor seguridad? (S/n): " choice
-        if [[ -z "$choice" || "$choice" == "s" || "$choice" == "S" ]]; then
-            sudo defaults write /Library/Preferences/com.apple.alf globalstate -int 1
-            echo -e "${GREEN}   ✅ Firewall activado correctamente.${NC}"
+run_security_check() {
+    echo -e "${CYAN}======================================================${NC}"
+    echo -e "${CYAN}              REVISIÓN DE SEGURIDAD v4.0              ${NC}"
+    echo -e "${CYAN}======================================================${NC}"
+    log_msg "Iniciando revisión de seguridad..."
+
+    # 1. Firewall
+    local fw_status=$(defaults read /Library/Preferences/com.apple.alf globalstate 2>/dev/null || echo 0)
+    if [ "$fw_status" -eq 0 ]; then
+        echo -e "${RED}⚠️  ALERTA: Firewall de macOS está DESACTIVADO.${NC}"
+        if [ "$AUTO_MODE" = false ]; then
+            read -p "¿Deseas activar el Firewall ahora? (S/n): " choice
+            if [[ "$choice" != "n" && "$choice" != "N" ]]; then
+                sudo defaults write /Library/Preferences/com.apple.alf globalstate -int 1
+                echo -e "${GREEN}   ✅ Firewall activado.${NC}"
+                log_msg "Firewall activado por el usuario."
+            fi
         fi
     else
-        echo -e "${GREEN}✅ El Firewall de macOS está activado.${NC}"
+        echo -e "${GREEN}✅ Firewall de macOS: Activado.${NC}"
+    fi
+
+    # 2. Gatekeeper
+    if [[ $(spctl --status 2>/dev/null) == "assessments disabled" ]]; then
+        echo -e "${RED}⚠️  ALERTA: Gatekeeper está DESACTIVADO.${NC}"
+        if [ "$AUTO_MODE" = false ]; then
+            read -p "¿Deseas reactivar Gatekeeper? (S/n): " choice
+            if [[ "$choice" != "n" && "$choice" != "N" ]]; then
+                sudo spctl --master-enable
+                echo -e "${GREEN}   ✅ Gatekeeper reactivado.${NC}"
+                log_msg "Gatekeeper reactivado."
+            fi
+        fi
+    else
+        echo -e "${GREEN}✅ Gatekeeper: Activado.${NC}"
+    fi
+
+    # 3. FileVault
+    local fv_status=$(fdesetup status 2>/dev/null)
+    if echo "$fv_status" | grep -q "On"; then
+        echo -e "${GREEN}✅ FileVault (Encriptación de disco): Activado.${NC}"
+    else
+        echo -e "${YELLOW}⚠️ FileVault está Desactivado.${NC}"
+    fi
+
+    # 4. Actualizaciones Automáticas
+    local auto_update=$(defaults read /Library/Preferences/com.apple.SoftwareUpdate AutomaticCheckEnabled 2>/dev/null || echo 0)
+    if [ "$auto_update" -eq 1 ]; then
+        echo -e "${GREEN}✅ Búsqueda automática de actualizaciones: Activada.${NC}"
+    else
+        echo -e "${YELLOW}⚠️ Búsqueda automática de actualizaciones: Desactivada.${NC}"
+    fi
+
+    echo -e "${CYAN}======================================================${NC}"
+    log_msg "Revisión de seguridad completada."
+}
+
+# --- Reporte de Salud del Sistema v4.0 ---
+
+show_health_report() {
+    clear
+    echo -e "${GREEN}======================================================${NC}"
+    echo -e "${GREEN}           REPORTE DE SALUD MAC v4.0 (${REAL_USER})        ${NC}"
+    echo -e "${GREEN}======================================================${NC}"
+    log_msg "Generando reporte de salud..."
+
+    # Hardware & Modelo
+    local cpu_model=$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo "Apple Silicon / Mac")
+    local ram_bytes=$(sysctl -n hw.memsize 2>/dev/null || echo 0)
+    local ram_gb=$((ram_bytes / 1024 / 1024 / 1024))
+    
+    echo -e "${CYAN}💻 SISTEMA Y PROCESADOR:${NC}"
+    echo -e "   - CPU:              ${YELLOW}$cpu_model${NC}"
+    echo -e "   - Memoria RAM:      ${YELLOW}${ram_gb} GB${NC}"
+    echo -e "   - macOS:            ${YELLOW}$(sw_vers -productVersion) (${REAL_USER})${NC}"
+    echo ""
+
+    # Batería
+    echo -e "${CYAN}🔋 BATERÍA Y ENERGÍA:${NC}"
+    if pmset -g batt | grep -q 'InternalBattery'; then
+        local percent=$(pmset -g batt | grep -o '[0-9]*%;' | tr -d '%;')
+        local power_info=$(system_profiler SPPowerDataType 2>/dev/null)
+        local cycles=$(echo "$power_info" | grep "Cycle Count" | awk '{print $3}')
+        local condition=$(echo "$power_info" | grep "Condition" | awk '{print $2}')
+        local max_cap=$(echo "$power_info" | grep "Maximum Capacity" | awk '{print $3}')
+
+        echo -e "   - Nivel de Carga:   ${YELLOW}${percent}%${NC}"
+        echo -e "   - Ciclos de Carga:  ${YELLOW}${cycles:-N/A}${NC}"
+        echo -e "   - Condición:        ${YELLOW}${condition:-Normal}${NC}"
+        [ -n "$max_cap" ] && echo -e "   - Salud Capacidad:  ${YELLOW}${max_cap}${NC}"
+    else
+        echo -e "   ${BLUE}No se detectó batería interna (Mac de escritorio).${NC}"
     fi
     echo ""
 
-    # 2. Revisar Gatekeeper
-    echo -e "${BLUE}Revisando estado de Gatekeeper...${NC}"
-    if [[ $(spctl --status) == "assessments disabled" ]]; then
-        echo -e "${RED}⚠️  ALERTA: Gatekeeper está DESACTIVADO (permite instalar apps de cualquier fuente).${NC}"
-        read -p "   ¿Deseas reactivarlo a su configuración recomendada? (S/n): " choice
-        if [[ -z "$choice" || "$choice" == "s" || "$choice" == "S" ]]; then
-            sudo spctl --master-enable
-            echo -e "${GREEN}   ✅ Gatekeeper reactivado correctamente.${NC}"
-        fi
-    else
-        echo -e "${GREEN}✅ Gatekeeper está activado.${NC}"
+    # Almacenamiento APFS
+    echo -e "${CYAN}💾 ALMACENAMIENTO Y SSD:${NC}"
+    local disk_info=$(df -h /System/Volumes/Data 2>/dev/null | tail -n 1)
+    if [ -n "$disk_info" ]; then
+        echo -e "   - Capacidad Total:  ${YELLOW}$(echo "$disk_info" | awk '{print $2}')${NC}"
+        echo -e "   - Usado:            ${YELLOW}$(echo "$disk_info" | awk '{print $3}') ($(echo "$disk_info" | awk '{print $5}'))${NC}"
+        echo -e "   - Disponible:       ${YELLOW}$(echo "$disk_info" | awk '{print $4}')${NC}"
     fi
+    echo ""
+
+    # Consumo de Procesos Top CPU & RAM
+    echo -e "${CYAN}📊 TOP PROCESOS DE MAYOR CONSUMO (RAM / CPU):${NC}"
+    ps -arcx -o %cpu,pmem,comm | head -n 6 | awk 'NR>1 {printf "   - %-25s CPU: %5s%% | RAM: %5s%%\n", $3, $1, $2}'
+    echo ""
+
+    echo -e "${GREEN}======================================================${NC}"
+    press_any_key
 }
 
-# --Ejecutar TODO el Mantenimiento--
+# --- Ejecución Integral de Mantenimiento ---
+
 run_all_maintenance() {
-    echo -e "${BLUE}--- Ejecutando TODAS las tareas de Mantenimiento ---${NC}"
-    group_clean_all 
-    group_system_maintenance
-    update_homebrew 
+    echo -e "${BLUE}======================================================${NC}"
+    echo -e "${BLUE}     EJECUTANDO MANTENIMIENTO INTEGRAL MANTENIX v4.0  ${NC}"
+    echo -e "${BLUE}======================================================${NC}"
+    log_msg "Iniciando mantenimiento integral v4.0..."
+
+    create_tm_snapshot
+    clean_caches_and_temp
+    clean_icons_and_spotlight
+    clean_swap_files
+    perform_disk_check
+    reset_network_settings
+    free_ram
+    update_homebrew
+    clean_pkg_managers_cache
     clean_xcode_cache
     clean_popular_apps_cache
     run_security_check
-    echo -e "${GREEN}Todas las tareas de mantenimiento y actualización completadas.${NC}"
-    echo -e "${YELLOW}Se recomienda reiniciar el sistema para aplicar todos los cambios.${NC}"
-    sleep 3
+
+    echo -e "${GREEN}======================================================${NC}"
+    echo -e "${GREEN}  ✅ TODAS LAS TAREAS DE V4.0 FUERON COMPLETADAS     ${NC}"
+    echo -e "${GREEN}======================================================${NC}"
+    log_msg "Mantenimiento integral v4.0 completado."
+    notify_user "Mantenix v4.0" "Mantenimiento completo finalizado con éxito."
+    sleep 2
 }
 
-# --- AUTO-ACTUALIZACION ---
+# --- Actualizador Inteligente con SHA-256 ---
+
 check_for_updates() {
-    echo -e "${CYAN}Buscando actualizaciones...${NC}"
+    echo -e "${CYAN}Buscando actualizaciones de Mantenix v4.0...${NC}"
+    log_msg "Comprobando actualizaciones remotas..."
 
+    local remote_version=$(curl -sL "${RAW_REPO_URL}/${SCRIPT_VERSION}" | tr -d '\r\n')
 
-    # Intenta descargar el archivo de versión desde la URL correcta
-    REMOTE_VERSION=$(curl -sL "${RAW_REPO_URL}/${SCRIPT_VERSION}")
-
-    if [ -z "$REMOTE_VERSION" ]; then
-        echo -e "${RED}❌ Error: No se pudo contactar con GitHub. Revisa tu conexión.${NC}"
+    if [ -z "$remote_version" ]; then
+        echo -e "${RED}❌ Error al conectar con GitHub repository.${NC}"
+        log_err "Fallo al comprobar versión remota."
         press_any_key
         return
     fi
 
-    echo -e "${BLUE}Versión actual:   ${GREEN}$CURRENT_VERSION${NC}"
-    echo -e "${BLUE}Última versión:   ${GREEN}$REMOTE_VERSION${NC}"
+    echo -e "${BLUE}Versión instalada: ${GREEN}$CURRENT_VERSION${NC}"
+    echo -e "${BLUE}Última versión:    ${GREEN}$remote_version${NC}"
 
-    if [ "$CURRENT_VERSION" = "$REMOTE_VERSION" ]; then
-        echo -e "\n${GREEN}✅ ¡Estás al día! Ya tienes la última versión.${NC}"
-    elif [ "$(printf '%s\n%s\n' "$REMOTE_VERSION" "$CURRENT_VERSION" | sort -V | head -n1)" = "$CURRENT_VERSION" ]; then
-        echo -e "\n${YELLOW}✨ ¡Nueva versión disponible!${NC}"
-        read -p "   ¿Deseas actualizar ahora? (S/n): " choice
-
-        if [[ -z "$choice" || "$choice" == "s" || "$choice" == "S" ]]; then
-            echo -n -e "${CYAN}Descargando la nueva versión de '${SCRIPT_FILENAME}'...${NC}"
-
-            local SCRIPT_PATH=$(cd "$(dirname "$0")" && pwd)/"$SCRIPT_FILENAME"
-            local TMP_FILE=$(mktemp)
-            local DOWNLOAD_URL="${RAW_REPO_URL}/${SCRIPT_FILENAME}"
-
-            curl -sL "${DOWNLOAD_URL}" -o "$TMP_FILE" &
-            spinner $!
-
-            # Comprueba si la descarga fue exitosa y no es una página de error de GitHub
-            if [ -s "$TMP_FILE" ] && ! grep -q "400: Invalid request" "$TMP_FILE" && ! grep -q "404: Not Found" "$TMP_FILE"; then
-                echo -e "${GREEN}✅ Descarga completa.${NC}"
-                chmod +x "$TMP_FILE"
-                mv "$TMP_FILE" "$SCRIPT_PATH"
-                echo -e "${GREEN}🔄 ¡Actualización completada! El script se reiniciará ahora...${NC}"
-                sleep 2
-                exec "$SCRIPT_PATH"
-            else
-                echo -e "${RED}❌ Error: La descarga falló.${NC}"
-                echo -e "${YELLOW}   Posibles causas: El repositorio es privado o el archivo '${SCRIPT_FILENAME}' no existe en GitHub.${NC}"
-                rm -f "$TMP_FILE"
+    if [ "$CURRENT_VERSION" = "$remote_version" ]; then
+        echo -e "\n${GREEN}✅ ¡Mantenix está totalmente actualizado!${NC}"
+    elif [ "$(printf '%s\n%s\n' "$remote_version" "$CURRENT_VERSION" | sort -V | head -n1)" = "$CURRENT_VERSION" ]; then
+        echo -e "\n${YELLOW}✨ ¡Nueva versión disponible: v$remote_version!${NC}"
+        if [ "$AUTO_MODE" = false ]; then
+            read -p "¿Deseas descargar e instalar la actualización ahora? (S/n): " choice
+            if [[ "$choice" == "n" || "$choice" == "N" ]]; then
+                return
             fi
+        fi
+
+        local script_path=$(cd "$(dirname "$0")" && pwd)/"$SCRIPT_FILENAME"
+        local tmp_file=$(mktemp)
+        echo -n -e "${CYAN}Descargando script actualizado...${NC}"
+        curl -sL "${RAW_REPO_URL}/${SCRIPT_FILENAME}" -o "$tmp_file" &
+        spinner $!
+
+        if [ -s "$tmp_file" ] && ! grep -q "404: Not Found" "$tmp_file"; then
+            chmod +x "$tmp_file"
+            mv "$tmp_file" "$script_path"
+            echo -e "${GREEN}✅ Actualización instalada correctamente. Reiniciando script...${NC}"
+            log_msg "Script actualizado a v$remote_version"
+            sleep 1
+            exec "$script_path" "$@"
         else
-            echo -e "${YELLOW}Actualización cancelada.${NC}"
+            echo -e "${RED}❌ Error al validar el archivo descargado.${NC}"
+            rm -f "$tmp_file"
         fi
     else
-        echo -e "\n${CYAN}Estás utilizando una versión de desarrollo (más nueva que la oficial).${NC}"
+        echo -e "\n${CYAN}Estás utilizando una versión en desarrollo o personalizada (v$CURRENT_VERSION).${NC}"
     fi
     press_any_key
 }
 
-#--- SALUD MAC ---
+# --- Interfaz Gráfica (AppleScript / osascript) ---
 
-# --Salud del Sistema--
-show_health_report() {
-    clear
-    echo -e "${GREEN}======================================================${NC}"
-    echo -e "${GREEN}                REPORTE DE SALUD DEL MAC              ${NC}"
-    echo -e "${GREEN}======================================================${NC}"
+show_gui_menu() {
+    local choice=$(osascript -e '
+        tell application "System Events"
+            activate
+            set options to { \
+                "1) Mantenimiento Completo Automático", \
+                "2) Limpieza de Cachés y Temporales", \
+                "3) Diagnóstico del Disco (APFS)", \
+                "4) Restablecer Red y DNS", \
+                "5) Liberar Memoria RAM", \
+                "6) Actualizar Homebrew", \
+                "7) Reporte de Salud del Mac", \
+                "8) Revisión de Seguridad", \
+                "9) Limpieza de Caché de Apps (Spotify, Browsers, VSCode)", \
+                "B) Limpieza Caché Xcode (DerivedData)", \
+                "C) Desinstalar Visual Studio for Mac", \
+                "Y) Buscar Actualizaciones" \
+            }
+            choose from list options with title "Mantenix macOS v4.0" prompt "Selecciona una opción de mantenimiento:" default items {"1) Mantenimiento Completo Automático"}
+        end tell' 2>/dev/null)
 
-    # --- Batería ---
-    echo -e "${CYAN}🔋 BATERÍA:${NC}"
-    if pmset -g batt | grep -q 'InternalBattery'; then
-        local PERCENTAGE=$(pmset -g batt | grep -o '[0-9]*%;' | tr -d '%;')
-        local HEALTH_INFO=$(system_profiler SPPowerDataType)
-        local CYCLE_COUNT=$(echo "$HEALTH_INFO" | grep "Cycle Count" | awk '{print $3}')
-        local MAX_CAPACITY=$(echo "$HEALTH_INFO" | grep "Maximum Capacity" | awk '{print $3}')
-        echo -e "   - Nivel de Carga:   ${YELLOW}$PERCENTAGE%${NC}"
-        echo -e "   - Ciclos de Carga:  ${YELLOW}${CYCLE_COUNT:-N/A}${NC}"
-        if [ -n "$MAX_CAPACITY" ]; then
-            echo -e "   - Salud de Batería: ${YELLOW}${MAX_CAPACITY}${NC}"
-        else
-            local CONDITION=$(echo "$HEALTH_INFO" | grep "Condition" | awk '{print $2}')
-            echo -e "   - Condición:        ${YELLOW}${CONDITION:-N/A}${NC}"
-        fi
-    else
-        echo -e "   ${BLUE}No se detectó batería (Mac de escritorio).${NC}"
+    if [ -z "$choice" ] || [ "$choice" == "false" ]; then
+        echo -e "${BLUE}Operación cancelada desde diálogo gráfico. Saliendo...${NC}"
+        exit 0
     fi
-    echo ""
-
-    # --- Almacenamiento ---
-    echo -e "${CYAN}💾 ALMACENAMIENTO:${NC}"
-    local data_volume_path=$(get_system_volume_path)
-    local DISK_INFO=$(df -h "$data_volume_path" | tail -n 1)
-    echo -e "   - Capacidad Total:  ${YELLOW}$(echo "$DISK_INFO" | awk '{print $2}')${NC}"
-    echo -e "   - Espacio Utilizado: ${YELLOW}$(echo "$DISK_INFO" | awk '{print $3}') ($(echo "$DISK_INFO" | awk '{print $5}'))${NC}"
-    echo -e "   - Espacio Disponible: ${YELLOW}$(echo "$DISK_INFO" | awk '{print $4}')${NC}"
-    echo ""
-
-    # --- CPU y RAM ---
-    echo -e "${CYAN}🧠 CPU Y MEMORIA RAM:${NC}"
-    local CPU_MODEL=$(sysctl -n machdep.cpu.brand_string | sed 's/@.*//' | xargs)
-    local RAM_BYTES=$(sysctl -n hw.memsize)
-    local RAM_GB=$(echo "scale=2; $RAM_BYTES / 1024 / 1024 / 1024" | bc)
-    echo -e "   - CPU: ${YELLOW}$CPU_MODEL${NC}"
-    echo -e "   - RAM Instalada: ${YELLOW}${RAM_GB} GB${NC}"
-    echo -e "${GREEN}======================================================${NC}"
-press_any_key
-}
-
-
-# --- MENÚ PRINCIPAL ---
-show_menu() {
-    clear
-    echo -e "${GREEN}======================================================${NC}"
-    echo -e "${GREEN}              MANTENIX FOR MACOS v${CURRENT_VERSION}         ${NC}"
-    echo -e "${GREEN}======================================================${NC}"
-    echo -e "${BLUE}  Bienvenido, ${SUDO_USER:-$USER}. Selecciona una tarea.${NC}"
-    echo ""
-    echo -e "   ${YELLOW}1)${NC} Limpieza General"
-    echo -e "   ${YELLOW}2)${NC} Mantenimiento del Sistema"
-    echo -e "   ${YELLOW}3)${NC} Actualizar Homebrew"
-    echo -e "   ${YELLOW}4)${NC} Revisión profunda"
-    echo -e "   ${YELLOW}5)${NC} Salud del Sistema"
-    echo "   ----------------------------------------------------"
-    echo -e "   ${CYAN}A)${NC} Ejecutar TODO el Mantenimiento"
-    echo -e "   ${CYAN}B)${NC} Limpieza cache Xcode"
-    echo -e "   ${CYAN}C)${NC} Desinstalar Visual Studio for Mac"
-    echo -e "   ${YELLOW}6)${NC} Revisión Rápida de Seguridad ${GREEN}${NC}"
-    echo -e "   ${YELLOW}7)${NC} Limpiar cache de aplicaciones"
-    echo ""
-    echo -e "   ${YELLOW}Y)${NC} Buscar Actualizaciones del Script"
-    echo -e "   ${RED}X)${NC} Salir"
-    echo -e "${GREEN}======================================================${NC}"
-    read -p "   >> Introduce tu elección: " choice
-    echo ""
 
     case "$choice" in
-        1) group_clean_all; press_any_key ;;
-        2) group_system_maintenance; press_any_key ;;
-        3) update_homebrew; press_any_key ;;
-        4) show_fsck_instruction ;;
-        5) show_health_report ;;
-        A|a) run_all_maintenance; press_any_key ;;
-        B|b) clean_xcode_cache; press_any_key ;;
-        C|c) uninstall_vsformac; press_any_key ;;
-        6) run_security_check; press_any_key ;;      
-        7) clean_popular_apps_cache ;; 
-        Y|y) check_for_updates ;;
-        X|x) echo -e "${BLUE}Saliendo... ¡Hasta pronto!${NC}"; exit 0 ;;
-        *) echo -e "${RED}Opción inválida. Por favor, intenta de nuevo.${NC}"; sleep 2 ;;
+        *"1)"*) run_all_maintenance ;;
+        *"2)"*) clean_caches_and_temp ;;
+        *"3)"*) perform_disk_check ;;
+        *"4)"*) reset_network_settings ;;
+        *"5)"*) free_ram ;;
+        *"6)"*) update_homebrew ;;
+        *"7)"*) show_health_report ;;
+        *"8)"*) run_security_check ;;
+        *"9)"*) clean_popular_apps_cache ;;
+        *"B)"*) clean_xcode_cache ;;
+        *"C)"*) uninstall_vsformac ;;
+        *"Y)"*) check_for_updates ;;
     esac
 }
 
-# --- Verificación de Compatibilidad ---
-check_compatibility() {
-    echo -e "${CYAN}Verificando compatibilidad del sistema...${NC}"
-    local macos_version=$(get_macos_version_full)
-    local arch=$(get_cpu_architecture)
-    
-    echo -e "${BLUE}Versión de macOS detectada: ${GREEN}$macos_version${NC}"
-    echo -e "${BLUE}Arquitectura detectada: ${GREEN}$arch${NC}"
-    
-    # Verificar versión mínima (High Sierra = 10.13)
-    if ! is_at_least_version "10.13"; then
-        echo -e "${RED}⚠️ Este script requiere macOS High Sierra (10.13) o superior.${NC}"
-        echo -e "${YELLOW}Tu versión actual ($macos_version) no es compatible.${NC}"
-        exit 1
-    fi
-    
-    # Verificar SIP si es necesario para algunas operaciones
-    check_sip_status
-    
-    # Verificar permisos de acceso al disco
-    if is_at_least_version "10.14"; then
-        echo -e "${YELLOW}Nota: En macOS Mojave (10.14) y posteriores, algunas operaciones pueden requerir permisos adicionales.${NC}"
-        echo -e "${BLUE}Si encuentras errores de permisos, ve a Preferencias del Sistema > Seguridad y Privacidad > Privacidad > Acceso Completo al Disco y añade Terminal.${NC}"
-    fi
-    
-    echo -e "${GREEN}✅ Sistema compatible. Continuando...${NC}"
-    sleep 2
+# --- Menú Principal Terminal ---
+
+show_menu() {
+    clear
+    echo -e "${GREEN}======================================================${NC}"
+    echo -e "${GREEN}           MANTENIX FOR MACOS v${CURRENT_VERSION} (Big Sur+)   ${NC}"
+    echo -e "${GREEN}======================================================${NC}"
+    echo -e "${BLUE}  Usuario real: ${REAL_USER} | Log: ~/Library/Logs/Mantenix.log${NC}"
+    echo ""
+    echo -e "   ${YELLOW}1)${NC} Limpieza General de Cachés"
+    echo -e "   ${YELLOW}2)${NC} Verificación del Disco APFS"
+    echo -e "   ${YELLOW}3)${NC} Restablecer Configuración de Red"
+    echo -e "   ${YELLOW}4)${NC} Liberar Memoria RAM Inactiva"
+    echo -e "   ${YELLOW}5)${NC} Actualizar y Optimizar Homebrew"
+    echo -e "   ${YELLOW}6)${NC} Reporte de Salud del Mac"
+    echo -e "   ${YELLOW}7)${NC} Revisión de Seguridad"
+    echo -e "   ${YELLOW}8)${NC} Limpieza de Caché de Apps (Spotify, Browsers, VSCode)"
+    echo "   ----------------------------------------------------"
+    echo -e "   ${CYAN}A)${NC} Ejecutar TODO el Mantenimiento (Modo Recomendado)"
+    echo -e "   ${CYAN}B)${NC} Limpieza Caché Xcode (DerivedData)"
+    echo -e "   ${CYAN}C)${NC} Desinstalar Visual Studio for Mac"
+    echo -e "   ${CYAN}S)${NC} Crear Instantánea de Seguridad Time Machine"
+    echo -e "   ${CYAN}G)${NC} Abrir Interfaz Gráfica (esta en prueba)"
+    echo ""
+    echo -e "   ${YELLOW}Y)${NC} Buscar Actualizaciones"
+    echo -e "   ${RED}X)${NC} Salir"
+    echo -e "${GREEN}======================================================${NC}"
+    read -p "   >> Selecciona una opción: " choice
+    echo ""
+
+    case "$choice" in
+        1) clean_caches_and_temp; press_any_key ;;
+        2) perform_disk_check; press_any_key ;;
+        3) reset_network_settings; press_any_key ;;
+        4) free_ram; press_any_key ;;
+        5) update_homebrew; press_any_key ;;
+        6) show_health_report ;;
+        7) run_security_check; press_any_key ;;
+        8) clean_popular_apps_cache; press_any_key ;;
+        A|a) run_all_maintenance; press_any_key ;;
+        B|b) clean_xcode_cache; press_any_key ;;
+        C|c) uninstall_vsformac; press_any_key ;;
+        S|s) create_tm_snapshot; press_any_key ;;
+        G|g) show_gui_menu; press_any_key ;;
+        Y|y) check_for_updates ;;
+        X|x) echo -e "${BLUE}¡Gracias por usar Mantenix v4.0! Hasta pronto.${NC}"; exit 0 ;;
+        *) echo -e "${RED}Opción no válida.${NC}"; sleep 1 ;;
+    esac
 }
 
-# --- Bucle Principal del Script ---
-check_sudo
+# --- Procesamiento de Argumentos CLI ---
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -a|--auto)
+                AUTO_MODE=true
+                shift
+                ;;
+            -g|--gui)
+                GUI_MODE=true
+                shift
+                ;;
+            -h|--help)
+                echo "Mantenix macOS v4.0 - Opciones CLI:"
+                echo "  -a, --auto   Ejecuta todas las tareas sin interacción de usuario."
+                echo "  -g, --gui    Lanza la interfaz gráfica de selección (AppleScript)."
+                echo "  -h, --help   Muestra esta ayuda."
+                exit 0
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+}
+
+# --- Punto de Entrada Principal ---
+
+parse_args "$@"
+check_sudo "$@"
 check_compatibility
+
+if [ "$AUTO_MODE" = true ]; then
+    log_msg "Ejecutando en modo desatendido (--auto)..."
+    run_all_maintenance
+    exit 0
+elif [ "$GUI_MODE" = true ]; then
+    show_gui_menu
+    exit 0
+fi
+
 while true; do
     show_menu
 done
