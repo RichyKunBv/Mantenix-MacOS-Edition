@@ -30,12 +30,12 @@ Ejemplo:
 
 ---
 
-## Funciones del Script (v3.0)
+## Funciones del Script (v3.1)
 
-La versión 3.0 del script ofrece un menú organizado con las siguientes opciones:
+La versión 3.1 del script ofrece un menú organizado con las siguientes opciones:
 
 
-<img width="387" height="341" alt="Captura de pantalla 2025-09-12 a la(s) 6 39 58 p m" src="https://github.com/user-attachments/assets/96eddb85-375d-4203-aead-67d3cd0cf4fd" />
+<img width="682" height="574" alt="Captura de pantalla 2026-08-09 a la(s) 2 50 06 p m" src="https://github.com/user-attachments/assets/5ce773d9-99a5-44f5-bf1e-d68489619cfb" />
 
 
 ### 1. Limpieza General¹
