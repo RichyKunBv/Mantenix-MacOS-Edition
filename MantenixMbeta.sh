@@ -8,7 +8,8 @@ CURRENT_VERSION="4.0"
 
 # --- URLs del Repositorio ---
 REPO_URL="https://github.com/RichyKunBv/Mantenix-MacOS-Edition"
-RAW_REPO_URL="https://raw.githubusercontent.com/RichyKunBv/Mantenix-MacOS-Edition/main"
+RAW_REPO_BASE="https://raw.githubusercontent.com/RichyKunBv/Mantenix-MacOS-Edition"
+RAW_REPO_URL="${RAW_REPO_BASE}/main"
 
 SCRIPT_FILENAME="MantenixMbeta.sh"
 SCRIPT_VERSION="versionBETA.txt"

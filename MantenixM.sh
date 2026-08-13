@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mantenimiento macOS
-CURRENT_VERSION="3.1"
+CURRENT_VERSION="3.1.1"
 
 # --- URLs del Repositorio ---
 REPO_URL="https://github.com/RichyKunBv/Mantenix-MacOS-Edition"
@@ -565,12 +565,29 @@ run_all_maintenance() {
 }
 
 # --- AUTO-ACTUALIZACION ---
+resolve_raw_repo_url() {
+    local candidate
+    for candidate in "${RAW_REPO_BASE}/main" "${RAW_REPO_BASE}/master"; do
+        if curl -fsSL "${candidate}/version.txt" >/dev/null 2>&1; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
 check_for_updates() {
     echo -e "${CYAN}Buscando actualizaciones...${NC}"
 
+    local repo_url
+    repo_url=$(resolve_raw_repo_url) || {
+        echo -e "${RED}❌ Error: No se pudo acceder al repositorio o la rama no existe.${NC}"
+        echo -e "${YELLOW}   Verifica que el repositorio sea público y que la rama principal sea 'main' o 'master'.${NC}"
+        press_any_key
+        return
+    }
 
-    # Intenta descargar el archivo de versión desde la URL correcta
-    REMOTE_VERSION=$(curl -sL "${RAW_REPO_URL}/${SCRIPT_VERSION}")
+    REMOTE_VERSION=$(curl -fsSL "${repo_url}/version.txt" 2>/dev/null || true)
 
     if [ -z "$REMOTE_VERSION" ]; then
         echo -e "${RED}❌ Error: No se pudo contactar con GitHub. Revisa tu conexión.${NC}"
@@ -592,13 +609,9 @@ check_for_updates() {
 
             local SCRIPT_PATH=$(cd "$(dirname "$0")" && pwd)/"$SCRIPT_FILENAME"
             local TMP_FILE=$(mktemp)
-            local DOWNLOAD_URL="${RAW_REPO_URL}/${SCRIPT_FILENAME}"
+            local DOWNLOAD_URL="${repo_url}/${SCRIPT_FILENAME}"
 
-            curl -sL "${DOWNLOAD_URL}" -o "$TMP_FILE" &
-            spinner $!
-
-            # Comprueba si la descarga fue exitosa y no es una página de error de GitHub
-            if [ -s "$TMP_FILE" ] && ! grep -q "400: Invalid request" "$TMP_FILE" && ! grep -q "404: Not Found" "$TMP_FILE"; then
+            if curl -fsSL "${DOWNLOAD_URL}" -o "$TMP_FILE" 2>/dev/null; then
                 echo -e "${GREEN}✅ Descarga completa.${NC}"
                 chmod +x "$TMP_FILE"
                 mv "$TMP_FILE" "$SCRIPT_PATH"
@@ -607,7 +620,7 @@ check_for_updates() {
                 exec "$SCRIPT_PATH"
             else
                 echo -e "${RED}❌ Error: La descarga falló.${NC}"
-                echo -e "${YELLOW}   Posibles causas: El repositorio es privado o el archivo '${SCRIPT_FILENAME}' no existe en GitHub.${NC}"
+                echo -e "${YELLOW}   Posibles causas: El repositorio es privado, la rama no existe o el archivo '${SCRIPT_FILENAME}' no está en GitHub.${NC}"
                 rm -f "$TMP_FILE"
             fi
         else
