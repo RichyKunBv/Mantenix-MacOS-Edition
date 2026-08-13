@@ -13,16 +13,16 @@ Este script proporciona un **menú interactivo** que te permite realizar diversa
 Para empezar a usar el script, primero dale permisos de ejecución. Abre la Terminal y ejecuta el siguiente comando (recuerda cambiar `(tu_usuario)` por tu nombre de usuario y ajusta la ruta si el script no está en tu Escritorio):
 
 ```sh
-chmod +x /Users/(tu_usuario)/Desktop/macos_mantenimiento.sh
+chmod +x /Users/(tu_usuario)/Desktop/MantenixM.sh
 ```
 
 Una vez que tenga los permisos, puedes ejecutar el script. Abre la Terminal y usa este comando:
 
 ```sh
-sudo /Users/(tu_usuario)/Desktop/macos_mantenimiento.sh
+sudo /Users/(tu_usuario)/Desktop/MantenixM.sh
 ```
 
-**Consejo rápido:** Para ejecutar el script de forma más sencilla, escribe `sudo ` (con el espacio al final) en la Terminal, luego simplemente **arrastra el archivo `macos_mantenimiento.sh` desde el Finder a la ventana de la Terminal** y presiona `Enter`.
+**Consejo rápido:** Para ejecutar el script de forma más sencilla, escribe `sudo ` (con el espacio al final) en la Terminal, luego simplemente **arrastra el archivo `MantenixM.sh` desde el Finder a la ventana de la Terminal** y presiona `Enter`.
 
 
 Ejemplo:
