@@ -3,8 +3,11 @@ name: Build macOS Apps
 on:
   push:
     branches: [ main, master ]
+    tags: [ '*' ]
   pull_request:
     branches: [ main, master ]
+  release:
+    types: [ published, created ]
   workflow_dispatch: # Permite ejecutar el workflow manualmente desde GitHub
 
 jobs:
