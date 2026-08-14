@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mantenimiento macOS
-CURRENT_VERSION="3.1.1"
+CURRENT_VERSION="3.1.2"
 
 REPO_URL="https://github.com/RichyKunBv/Mantenix-MacOS-Edition"
 RAW_REPO_BASE="https://raw.githubusercontent.com/RichyKunBv/Mantenix-MacOS-Edition"
