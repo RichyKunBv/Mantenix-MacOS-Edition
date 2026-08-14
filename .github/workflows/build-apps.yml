@@ -13,6 +13,8 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout repository
@@ -55,10 +57,18 @@ jobs:
         zip -r MantenixM.zip MantenixM.app
         zip -r MantenixMbeta.zip MantenixMbeta.app
 
-    - name: Upload Artifacts
+    - name: Upload Artifacts (Actions Tab)
       uses: actions/upload-artifact@v4
       with:
         name: Mantenix-macOS-Apps
         path: |
+          MantenixM.zip
+          MantenixMbeta.zip
+
+    - name: Upload to GitHub Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
           MantenixM.zip
           MantenixMbeta.zip
