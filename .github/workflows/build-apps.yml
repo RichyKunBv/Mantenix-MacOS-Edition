@@ -1,0 +1,61 @@
+name: Build macOS Apps
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: # Permite ejecutar el workflow manualmente desde GitHub
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Build macOS Apps
+      run: |
+        build_app() {
+            local APP_NAME=$1
+            local SCRIPT_NAME=$2
+            local VERSION_FILE=$3
+            
+            cat << EOF > run.applescript
+        set scriptPath to POSIX path of (path to me) & "Contents/Resources/${SCRIPT_NAME}"
+        tell application "Terminal"
+            do script "bash '" & scriptPath & "'"
+            activate
+        end tell
+        EOF
+            osacompile -o "${APP_NAME}.app" run.applescript
+            mkdir -p "${APP_NAME}.app/Contents/Resources"
+            cp "${SCRIPT_NAME}" "${APP_NAME}.app/Contents/Resources/"
+            chmod +x "${APP_NAME}.app/Contents/Resources/${SCRIPT_NAME}"
+            cp forAPP/icon.icns "${APP_NAME}.app/Contents/Resources/"
+            rm -f "${APP_NAME}.app/Contents/Resources/applet.icns"
+            
+            VERSION=$(cat "$VERSION_FILE" | tr -d '[:space:]')
+            if [ "$APP_NAME" = "MantenixMbeta" ]; then
+                sed -e "s/@APP_VERSION@/${VERSION}/g" -e "s/MantenixM/MantenixMbeta/g" -e "s/com.esmesolutions.mantenixm/com.esmesolutions.mantenixmbeta/g" forAPP/Info.plist.template > "${APP_NAME}.app/Contents/Info.plist"
+            else
+                sed "s/@APP_VERSION@/${VERSION}/g" forAPP/Info.plist.template > "${APP_NAME}.app/Contents/Info.plist"
+            fi
+        }
+
+        build_app "MantenixM" "MantenixM.sh" "version.txt"
+        build_app "MantenixMbeta" "MantenixMbeta.sh" "versionBETA.txt"
+
+    - name: Compress Apps to ZIP
+      run: |
+        zip -r MantenixM.zip MantenixM.app
+        zip -r MantenixMbeta.zip MantenixMbeta.app
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Mantenix-macOS-Apps
+        path: |
+          MantenixM.zip
+          MantenixMbeta.zip
