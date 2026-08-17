@@ -179,7 +179,7 @@ clean_caches_and_temp() {
     # Limpieza de sistema
     echo -e "${BLUE}Limpiando cachés de sistema y logs...${NC}"
     sudo rm -rf /Library/Caches/* 2>/dev/null
-    sudo rm -rf /private/var/log/* 2>/dev/null
+    sudo find /private/var/log -type f \( -name "*.log" -o -name "*.gz" -o -name "*.asl" \) -delete 2>/dev/null
     sudo rm -rf /Library/Logs/* 2>/dev/null
 
     # Limpieza segura de /private/var/folders (solo Caches y TemporaryItems)
@@ -200,9 +200,9 @@ clean_icons_and_spotlight() {
     sudo find /private/var/folders -name "com.apple.iconservices*" -exec rm -rf {} + 2>/dev/null || true
     sudo find /private/var/folders -name "com.apple.metadata*" -exec rm -rf {} + 2>/dev/null || true
 
-    echo -e "${BLUE}Reiniciando e reindexando Spotlight (/System/Volumes/Data)...${NC}"
+    echo -e "${BLUE}Reiniciando e reindexando Spotlight (/)...${NC}"
     sudo mdutil -i off / &>/dev/null
-    sudo mdutil -E /System/Volumes/Data &>/dev/null
+    sudo mdutil -E / &>/dev/null
     sudo mdutil -i on / &>/dev/null
 
     echo -e "${GREEN}✅ Reindexación de Spotlight activada.${NC}"
@@ -221,19 +221,23 @@ clean_swap_files() {
         return
     fi
 
-    echo -e "${RED}⚠️  Atención: Se eliminarán los archivos swap inactivos.${NC}"
-    if [ "$AUTO_MODE" = false ]; then
-        read -p "¿Deseas continuar con la eliminación de swap? (s/N): " confirm
-        if [[ "$confirm" != "s" && "$confirm" != "S" ]]; then
-            echo -e "${YELLOW}Operación cancelada.${NC}"
-            log_msg "Limpieza de Swap cancelada."
-            return
-        fi
+    if [ "$AUTO_MODE" = true ]; then
+        echo -e "${YELLOW}⚠️ Modo automático activo: Se omite el borrado de swap para prevenir inestabilidad del kernel.${NC}"
+        log_warn "Borrado de swap omitido en modo desatendido."
+        return
+    fi
+
+    echo -e "${RED}⚠️  PELIGRO: Forzar el borrado de swap con aplicaciones abiertas puede congelar el sistema.${NC}"
+    read -p "¿Deseas forzar la eliminación de swap de todos modos? (s/N): " confirm
+    if [[ "$confirm" != "s" && "$confirm" != "S" ]]; then
+        echo -e "${YELLOW}Operación cancelada.${NC}"
+        log_msg "Limpieza de Swap cancelada."
+        return
     fi
 
     echo -e "${BLUE}Eliminando archivos swap...${NC}"
     sudo rm -f /private/var/vm/swapfile* 2>/dev/null
-    echo -e "${GREEN}✅ Archivos swap eliminados.${NC}"
+    echo -e "${GREEN}✅ Archivos swap eliminados. Se recomienda reiniciar el equipo.${NC}"
     log_msg "Swap eliminado con éxito."
     sleep 1
 }
@@ -579,7 +583,7 @@ run_all_maintenance() {
     create_tm_snapshot
     clean_caches_and_temp
     clean_icons_and_spotlight
-    clean_swap_files
+    # clean_swap_files
     perform_disk_check
     reset_network_settings
     free_ram
