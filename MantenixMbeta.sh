@@ -145,6 +145,24 @@ create_tm_snapshot() {
     sleep 1
 }
 
+clean_tm_snapshots() {
+    echo -e "${YELLOW}--- Eliminando snapshots locales de Time Machine (APFS) ---${NC}"
+    log_msg "Eliminando snapshots locales acumulados..."
+    
+    local snapshots=$(tmutil listlocalsnapshots / 2>/dev/null | awk -F. '{print $4}')
+    if [ -z "$snapshots" ]; then
+        echo -e "${BLUE}ℹ️ No se encontraron snapshots locales de Time Machine.${NC}"
+    else
+        echo -n -e "${BLUE}Purgando snapshots...${NC}"
+        for s in $snapshots; do
+            [ -n "$s" ] && sudo tmutil deletelocalsnapshots "$s" &>/dev/null
+        done
+        echo -e "${GREEN}✅ Snapshots de Time Machine eliminados.${NC}"
+        log_msg "Snapshots locales eliminados."
+    fi
+    sleep 1
+}
+
 # --- Tareas de Limpieza ---
 
 clean_caches_and_temp() {
@@ -152,14 +170,17 @@ clean_caches_and_temp() {
     log_msg "Iniciando limpieza de cachés y temporales..."
 
     # Limpieza de usuario real
-    echo -e "${BLUE}Limpiando cachés del usuario ($REAL_USER)...${NC}"
+    echo -e "${BLUE}Limpiando cachés, logs y papelera del usuario ($REAL_USER)...${NC}"
     rm -rf "$REAL_HOME/Library/Caches/"* "$REAL_HOME/Library/Logs/"* "$REAL_HOME/Library/Saved Application State/"* 2>/dev/null
-    log_msg "Cachés de usuario en $REAL_HOME/Library/Caches borrados."
+    rm -rf "$REAL_HOME/.cache/"* 2>/dev/null
+    rm -rf "$REAL_HOME/.Trash/"* 2>/dev/null
+    log_msg "Cachés de usuario, logs, papelera y .cache borrados."
 
     # Limpieza de sistema
-    echo -e "${BLUE}Limpiando cachés de /Library/Caches...${NC}"
+    echo -e "${BLUE}Limpiando cachés de sistema y logs...${NC}"
     sudo rm -rf /Library/Caches/* 2>/dev/null
     sudo rm -rf /private/var/log/* 2>/dev/null
+    sudo rm -rf /Library/Logs/* 2>/dev/null
 
     # Limpieza segura de /private/var/folders (solo Caches y TemporaryItems)
     echo -e "${BLUE}Limpiando subdirectorios de Caches y TemporaryItems en /private/var/folders...${NC}"
@@ -294,7 +315,7 @@ update_homebrew() {
         "$brew_path" update
         "$brew_path" upgrade
         "$brew_path" upgrade --cask --greedy 2>/dev/null || true
-        "$brew_path" cleanup -s
+        "$brew_path" cleanup -s --prune=all
         "$brew_path" doctor || true
 BREW_CMD
 
@@ -324,8 +345,18 @@ clean_pkg_managers_cache() {
         ((count++))
     fi
 
+    if sudo -u "$REAL_USER" command -v dotnet &>/dev/null; then
+        echo -n -e "${BLUE}Limpiando caché de .NET/NuGet...${NC}"
+        sudo -u "$REAL_USER" dotnet nuget locals all --clear &>/dev/null &
+        spinner $!
+        sudo -u "$REAL_USER" rm -rf "$REAL_HOME/.local/share/NuGet/http-cache" 2>/dev/null
+        sudo -u "$REAL_USER" rm -rf "$REAL_HOME/.dotnet/packs/"* 2>/dev/null
+        echo -e "${GREEN}✅ .NET/NuGet limpiado.${NC}"
+        ((count++))
+    fi
+
     if [ $count -eq 0 ]; then
-        echo -e "${BLUE}ℹ️ No se detectaron npm ni pip instalados.${NC}"
+        echo -e "${BLUE}ℹ️ No se detectaron npm, pip ni dotnet instalados.${NC}"
     fi
 }
 
@@ -544,6 +575,7 @@ run_all_maintenance() {
     echo -e "${BLUE}======================================================${NC}"
     log_msg "Iniciando mantenimiento integral v4.0..."
 
+    clean_tm_snapshots
     create_tm_snapshot
     clean_caches_and_temp
     clean_icons_and_spotlight
@@ -633,6 +665,7 @@ show_gui_menu() {
                 "7) Reporte de Salud del Mac", \
                 "8) Revisión de Seguridad", \
                 "9) Limpieza de Caché de Apps (Spotify, Browsers, VSCode)", \
+                "A) Purgar Snapshots Locales (Time Machine)", \
                 "B) Limpieza Caché Xcode (DerivedData)", \
                 "C) Desinstalar Visual Studio for Mac", \
                 "Y) Buscar Actualizaciones" \
@@ -655,6 +688,7 @@ show_gui_menu() {
         *"7)"*) show_health_report ;;
         *"8)"*) run_security_check ;;
         *"9)"*) clean_popular_apps_cache ;;
+        *"A)"*) clean_tm_snapshots ;;
         *"B)"*) clean_xcode_cache ;;
         *"C)"*) uninstall_vsformac ;;
         *"Y)"*) check_for_updates ;;
@@ -678,6 +712,7 @@ show_menu() {
     echo -e "   ${YELLOW}6)${NC} Reporte de Salud del Mac"
     echo -e "   ${YELLOW}7)${NC} Revisión de Seguridad"
     echo -e "   ${YELLOW}8)${NC} Limpieza de Caché de Apps (Spotify, Browsers, VSCode)"
+    echo -e "   ${YELLOW}9)${NC} Purgar Snapshots Locales (Time Machine)"
     echo "   ----------------------------------------------------"
     echo -e "   ${CYAN}A)${NC} Ejecutar TODO el Mantenimiento (Modo Recomendado)"
     echo -e "   ${CYAN}B)${NC} Limpieza Caché Xcode (DerivedData)"
@@ -700,6 +735,7 @@ show_menu() {
         6) show_health_report ;;
         7) run_security_check; press_any_key ;;
         8) clean_popular_apps_cache; press_any_key ;;
+        9) clean_tm_snapshots; press_any_key ;;
         A|a) run_all_maintenance; press_any_key ;;
         B|b) clean_xcode_cache; press_any_key ;;
         C|c) uninstall_vsformac; press_any_key ;;
