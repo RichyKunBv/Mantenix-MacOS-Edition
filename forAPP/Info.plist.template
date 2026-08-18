@@ -24,6 +24,8 @@
     <string>NSApplication</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>MantenixM necesita permiso para controlar la Terminal para ejecutar sus comandos.</string>
     <key>LSMinimumSystemVersion</key>
     <string>10.15</string>
 </dict>

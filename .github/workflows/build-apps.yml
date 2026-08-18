@@ -2,10 +2,7 @@ name: Build macOS Apps
 
 on:
   push:
-    branches: [ main, master ]
     tags: [ '*' ]
-  pull_request:
-    branches: [ main, master ]
   release:
     types: [ published, created ]
   workflow_dispatch: # Permite ejecutar el workflow manualmente desde GitHub
@@ -47,6 +44,9 @@ jobs:
             else
                 sed "s/@APP_VERSION@/${VERSION}/g" forAPP/Info.plist.template > "${APP_NAME}.app/Contents/Info.plist"
             fi
+            
+            # Firmar la app de forma ad-hoc para evitar algunos errores de "App dañada"
+            codesign --force --deep -s - "${APP_NAME}.app"
         }
 
         build_app "MantenixM" "MantenixM.sh" "version.txt"
@@ -54,8 +54,9 @@ jobs:
 
     - name: Compress Apps to ZIP
       run: |
-        zip -r MantenixM.zip MantenixM.app
-        zip -r MantenixMbeta.zip MantenixMbeta.app
+        # Usar ditto en lugar de zip para preservar los atributos y permisos de macOS
+        ditto -c -k --keepParent MantenixM.app MantenixM.zip
+        ditto -c -k --keepParent MantenixMbeta.app MantenixMbeta.zip
 
     - name: Upload Artifacts (Actions Tab)
       uses: actions/upload-artifact@v4
