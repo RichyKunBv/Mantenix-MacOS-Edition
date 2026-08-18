@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mantenimiento macOS
-CURRENT_VERSION="3.1.3"
+CURRENT_VERSION="3.1.4"
 
 REPO_URL="https://github.com/RichyKunBv/Mantenix-MacOS-Edition"
 RAW_REPO_BASE="https://raw.githubusercontent.com/RichyKunBv/Mantenix-MacOS-Edition"
@@ -605,23 +605,70 @@ check_for_updates() {
         read -p "   ¿Deseas actualizar ahora? (S/n): " choice
 
         if [[ -z "$choice" || "$choice" == "s" || "$choice" == "S" ]]; then
-            echo -n -e "${CYAN}Descargando la nueva versión de '${SCRIPT_FILENAME}'...${NC}"
-
-            local SCRIPT_PATH=$(cd "$(dirname "$0")" && pwd)/"$SCRIPT_FILENAME"
-            local TMP_FILE=$(mktemp)
-            local DOWNLOAD_URL="${repo_url}/${SCRIPT_FILENAME}"
-
-            if curl -fsSL "${DOWNLOAD_URL}" -o "$TMP_FILE" 2>/dev/null; then
-                echo -e "${GREEN}✅ Descarga completa.${NC}"
-                chmod +x "$TMP_FILE"
-                mv "$TMP_FILE" "$SCRIPT_PATH"
-                echo -e "${GREEN}🔄 ¡Actualización completada! El script se reiniciará ahora...${NC}"
-                sleep 2
-                exec "$SCRIPT_PATH"
+            local SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+            
+            if [[ "$SCRIPT_DIR" == *".app/Contents/Resources" ]]; then
+                # Modo App (Descargar ZIP de Releases)
+                echo -e "${CYAN}Descargando la nueva versión desde GitHub Releases...${NC}"
+                local APP_PATH=$(dirname $(dirname "$SCRIPT_DIR"))
+                local APP_NAME=$(basename "$APP_PATH")
+                local ZIP_NAME="${APP_NAME%.app}.zip"
+                local DOWNLOAD_URL="https://github.com/RichyKunBv/Mantenix-MacOS-Edition/releases/latest/download/${ZIP_NAME}"
+                local TMP_DIR="/tmp/MantenixUpdate_$$"
+                
+                mkdir -p "$TMP_DIR"
+                local ZIP_FILE="$TMP_DIR/$ZIP_NAME"
+                
+                # Usar curl -L para seguir redirecciones (necesario en Releases de GitHub)
+                if curl -fsSL -L "$DOWNLOAD_URL" -o "$ZIP_FILE" 2>/dev/null; then
+                    echo -e "${GREEN}✅ Descarga completa. Extrayendo...${NC}"
+                    unzip -q -o "$ZIP_FILE" -d "$TMP_DIR"
+                    
+                    if [ -d "$TMP_DIR/$APP_NAME" ]; then
+                        echo -e "${GREEN}🔄 Instalando actualización...${NC}"
+                        
+                        # Crear script satélite para reemplazar la app
+                        local UPDATER_SCRIPT="$TMP_DIR/updater.sh"
+                        cat << EOF > "$UPDATER_SCRIPT"
+#!/bin/bash
+sleep 2
+rm -rf "$APP_PATH"
+mv "$TMP_DIR/$APP_NAME" "$APP_PATH"
+open "$APP_PATH"
+rm -rf "$TMP_DIR"
+EOF
+                        chmod +x "$UPDATER_SCRIPT"
+                        
+                        echo -e "${GREEN}La aplicación se reiniciará en unos segundos...${NC}"
+                        nohup "$UPDATER_SCRIPT" >/dev/null 2>&1 &
+                        exit 0
+                    else
+                        echo -e "${RED}❌ Error: No se encontró la aplicación dentro del ZIP descargado.${NC}"
+                        rm -rf "$TMP_DIR"
+                    fi
+                else
+                    echo -e "${RED}❌ Error: Falló la descarga desde GitHub Releases.${NC}"
+                    rm -rf "$TMP_DIR"
+                fi
             else
-                echo -e "${RED}❌ Error: La descarga falló.${NC}"
-                echo -e "${YELLOW}   Posibles causas: El repositorio es privado, la rama no existe o el archivo '${SCRIPT_FILENAME}' no está en GitHub.${NC}"
-                rm -f "$TMP_FILE"
+                # Modo Script clásico
+                echo -n -e "${CYAN}Descargando la nueva versión de '${SCRIPT_FILENAME}'...${NC}"
+                local SCRIPT_PATH="${SCRIPT_DIR}/${SCRIPT_FILENAME}"
+                local TMP_FILE=$(mktemp)
+                local RAW_DOWNLOAD_URL="${repo_url}/${SCRIPT_FILENAME}"
+
+                if curl -fsSL "${RAW_DOWNLOAD_URL}" -o "$TMP_FILE" 2>/dev/null; then
+                    echo -e "${GREEN}✅ Descarga completa.${NC}"
+                    chmod +x "$TMP_FILE"
+                    mv "$TMP_FILE" "$SCRIPT_PATH"
+                    echo -e "${GREEN}🔄 ¡Actualización completada! El script se reiniciará ahora...${NC}"
+                    sleep 2
+                    exec "$SCRIPT_PATH"
+                else
+                    echo -e "${RED}❌ Error: La descarga falló.${NC}"
+                    echo -e "${YELLOW}   Posibles causas: El repositorio es privado o el archivo no existe.${NC}"
+                    rm -f "$TMP_FILE"
+                fi
             fi
         else
             echo -e "${YELLOW}Actualización cancelada.${NC}"

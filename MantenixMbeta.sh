@@ -26,7 +26,7 @@ fi
 
 # --- Directorio y Archivo de Log ---
 LOG_DIR="$REAL_HOME/Library/Logs"
-LOG_FILE="$LOG_DIR/Mantenix.log"
+LOG_FILE="$LOG_DIR/MantenixBETA.log"
 mkdir -p "$LOG_DIR" 2>/dev/null
 
 # --- Colores y Estilos ---
@@ -630,22 +630,75 @@ check_for_updates() {
             fi
         fi
 
-        local script_path=$(cd "$(dirname "$0")" && pwd)/"$SCRIPT_FILENAME"
-        local tmp_file=$(mktemp)
-        echo -n -e "${CYAN}Descargando script actualizado...${NC}"
-        curl -sL "${RAW_REPO_URL}/${SCRIPT_FILENAME}" -o "$tmp_file" &
-        spinner $!
-
-        if [ -s "$tmp_file" ] && ! grep -q "404: Not Found" "$tmp_file"; then
-            chmod +x "$tmp_file"
-            mv "$tmp_file" "$script_path"
-            echo -e "${GREEN}✅ Actualización instalada correctamente. Reiniciando script...${NC}"
-            log_msg "Script actualizado a v$remote_version"
-            sleep 1
-            exec "$script_path" "$@"
+        local SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+        
+        if [[ "$SCRIPT_DIR" == *".app/Contents/Resources" ]]; then
+            # Modo App (Descargar ZIP de Releases)
+            echo -e "${CYAN}Descargando la nueva versión desde GitHub Releases...${NC}"
+            local APP_PATH=$(dirname $(dirname "$SCRIPT_DIR"))
+            local APP_NAME=$(basename "$APP_PATH")
+            local ZIP_NAME="${APP_NAME%.app}.zip"
+            local DOWNLOAD_URL="https://github.com/RichyKunBv/Mantenix-MacOS-Edition/releases/latest/download/${ZIP_NAME}"
+            local TMP_DIR="/tmp/MantenixUpdate_$$"
+            
+            mkdir -p "$TMP_DIR"
+            local ZIP_FILE="$TMP_DIR/$ZIP_NAME"
+            
+            curl -fsSL -L "$DOWNLOAD_URL" -o "$ZIP_FILE" 2>/dev/null &
+            spinner $!
+            
+            if [ -f "$ZIP_FILE" ]; then
+                echo -e "${GREEN}✅ Descarga completa. Extrayendo...${NC}"
+                unzip -q -o "$ZIP_FILE" -d "$TMP_DIR"
+                
+                if [ -d "$TMP_DIR/$APP_NAME" ]; then
+                    echo -e "${GREEN}🔄 Instalando actualización...${NC}"
+                    log_msg "Instalando nueva versión de la app v$remote_version"
+                    
+                    local UPDATER_SCRIPT="$TMP_DIR/updater.sh"
+                    cat << EOF > "$UPDATER_SCRIPT"
+#!/bin/bash
+sleep 2
+rm -rf "$APP_PATH"
+mv "$TMP_DIR/$APP_NAME" "$APP_PATH"
+open "$APP_PATH"
+rm -rf "$TMP_DIR"
+EOF
+                    chmod +x "$UPDATER_SCRIPT"
+                    
+                    echo -e "${GREEN}La aplicación se reiniciará en unos segundos...${NC}"
+                    nohup "$UPDATER_SCRIPT" >/dev/null 2>&1 &
+                    exit 0
+                else
+                    echo -e "${RED}❌ Error: No se encontró la aplicación dentro del ZIP descargado.${NC}"
+                    log_err "Fallo la extracción de la app al actualizar."
+                    rm -rf "$TMP_DIR"
+                fi
+            else
+                echo -e "${RED}❌ Error: Falló la descarga desde GitHub Releases.${NC}"
+                log_err "Error al descargar ZIP de releases."
+                rm -rf "$TMP_DIR"
+            fi
         else
-            echo -e "${RED}❌ Error al validar el archivo descargado.${NC}"
-            rm -f "$tmp_file"
+            # Modo Script clásico
+            local script_path="${SCRIPT_DIR}/${SCRIPT_FILENAME}"
+            local tmp_file=$(mktemp)
+            echo -n -e "${CYAN}Descargando script actualizado...${NC}"
+            curl -sL "${RAW_REPO_URL}/${SCRIPT_FILENAME}" -o "$tmp_file" &
+            spinner $!
+
+            if [ -s "$tmp_file" ] && ! grep -q "404: Not Found" "$tmp_file"; then
+                chmod +x "$tmp_file"
+                mv "$tmp_file" "$script_path"
+                echo -e "${GREEN}✅ Actualización instalada correctamente. Reiniciando script...${NC}"
+                log_msg "Script actualizado a v$remote_version"
+                sleep 1
+                exec "$script_path" "$@"
+            else
+                echo -e "${RED}❌ Error al validar el archivo descargado.${NC}"
+                log_err "Fallo al validar script descargado en actualización."
+                rm -f "$tmp_file"
+            fi
         fi
     else
         echo -e "\n${CYAN}Estás utilizando una versión en desarrollo o personalizada (v$CURRENT_VERSION).${NC}"
@@ -657,7 +710,7 @@ check_for_updates() {
 
 show_gui_menu() {
     local choice=$(osascript -e '
-        tell application "System Events"
+        tell application (path to frontmost application as text)
             activate
             set options to { \
                 "1) Mantenimiento Completo Automático", \
@@ -706,7 +759,7 @@ show_menu() {
     echo -e "${GREEN}======================================================${NC}"
     echo -e "${GREEN}           MANTENIX FOR MACOS v${CURRENT_VERSION} (Big Sur+)   ${NC}"
     echo -e "${GREEN}======================================================${NC}"
-    echo -e "${BLUE}  Usuario real: ${REAL_USER} | Log: ~/Library/Logs/Mantenix.log${NC}"
+    echo -e "${BLUE}  Usuario real: ${REAL_USER} | Log: ~/Library/Logs/MantenixBETA.log${NC}"
     echo ""
     echo -e "   ${YELLOW}1)${NC} Limpieza General de Cachés"
     echo -e "   ${YELLOW}2)${NC} Verificación del Disco APFS"
