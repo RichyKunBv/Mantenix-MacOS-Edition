@@ -25,7 +25,7 @@ if [[ -z "$REAL_HOME" || ! -d "$REAL_HOME" ]]; then
 fi
 
 # --- Directorio y Archivo de Log ---
-LOG_DIR="$REAL_HOME/Library/Logs"
+LOG_DIR="$REAL_HOME/Library/Logs/Mantenix"
 LOG_FILE="$LOG_DIR/MantenixBETA.log"
 mkdir -p "$LOG_DIR" 2>/dev/null
 
@@ -72,7 +72,7 @@ spinner() {
     local pid=$1
     local delay=0.1
     local spinstr='|/-\'
-    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+    while kill -0 "$pid" 2>/dev/null; do
         local temp=${spinstr#?}
         printf " [%c]  " "$spinstr"
         local spinstr=$temp${spinstr%"$temp"}
@@ -171,7 +171,9 @@ clean_caches_and_temp() {
 
     # Limpieza de usuario real
     echo -e "${BLUE}Limpiando cachés, logs y papelera del usuario ($REAL_USER)...${NC}"
-    rm -rf "$REAL_HOME/Library/Caches/"* "$REAL_HOME/Library/Logs/"* "$REAL_HOME/Library/Saved Application State/"* 2>/dev/null
+    rm -rf "$REAL_HOME/Library/Caches/"* "$REAL_HOME/Library/Saved Application State/"* 2>/dev/null
+    # Purgar logs preservando el directorio de Mantenix
+    find "$REAL_HOME/Library/Logs" -mindepth 1 ! -name "Mantenix" ! -path "*/Mantenix/*" -delete 2>/dev/null || true
     rm -rf "$REAL_HOME/.cache/"* 2>/dev/null
     rm -rf "$REAL_HOME/.Trash/"* 2>/dev/null
     log_msg "Cachés de usuario, logs, papelera y .cache borrados."
@@ -200,10 +202,13 @@ clean_icons_and_spotlight() {
     sudo find /private/var/folders -name "com.apple.iconservices*" -exec rm -rf {} + 2>/dev/null || true
     sudo find /private/var/folders -name "com.apple.metadata*" -exec rm -rf {} + 2>/dev/null || true
 
-    echo -e "${BLUE}Reiniciando e reindexando Spotlight (/)...${NC}"
+    echo -e "${BLUE}Reiniciando e reindexando Spotlight (/ y Datos)...${NC}"
     sudo mdutil -i off / &>/dev/null
+    sudo mdutil -i off /System/Volumes/Data &>/dev/null || true
     sudo mdutil -E / &>/dev/null
+    sudo mdutil -E /System/Volumes/Data &>/dev/null || true
     sudo mdutil -i on / &>/dev/null
+    sudo mdutil -i on /System/Volumes/Data &>/dev/null || true
 
     echo -e "${GREEN}✅ Reindexación de Spotlight activada.${NC}"
     log_msg "Spotlight reindexado con éxito."
@@ -429,18 +434,19 @@ clean_popular_apps_cache() {
     echo -e "${CYAN}--- Limpieza de Cachés de Aplicaciones Populares ---${NC}"
     log_msg "Limpiando cachés de aplicaciones populares..."
 
-    declare -A APPS=(
-        ["Spotify"]="$REAL_HOME/Library/Application Support/Spotify/PersistentCache"
-        ["Google Chrome"]="$REAL_HOME/Library/Caches/Google/Chrome"
-        ["Firefox"]="$REAL_HOME/Library/Caches/Firefox"
-        ["Microsoft Edge"]="$REAL_HOME/Library/Caches/Microsoft Edge"
-        ["Slack"]="$REAL_HOME/Library/Caches/com.tinyspeck.slackmacgap"
-        ["VS Code"]="$REAL_HOME/Library/Caches/com.microsoft.VSCode"
+    local app_entries=(
+        "Spotify|$REAL_HOME/Library/Application Support/Spotify/PersistentCache"
+        "Google Chrome|$REAL_HOME/Library/Caches/Google/Chrome"
+        "Firefox|$REAL_HOME/Library/Caches/Firefox"
+        "Microsoft Edge|$REAL_HOME/Library/Caches/Microsoft Edge"
+        "Slack|$REAL_HOME/Library/Caches/com.tinyspeck.slackmacgap"
+        "VS Code|$REAL_HOME/Library/Caches/com.microsoft.VSCode"
     )
 
     local cleaned=0
-    for app in "${!APPS[@]}"; do
-        local path="${APPS[$app]}"
+    for entry in "${app_entries[@]}"; do
+        local app="${entry%%|*}"
+        local path="${entry#*|}"
         if [ -d "$path" ] && [ "$(ls -A "$path" 2>/dev/null)" ]; then
             echo -e "${BLUE}Limpiando caché de $app...${NC}"
             rm -rf "$path"/* 2>/dev/null || true
@@ -564,7 +570,7 @@ show_health_report() {
 
     # Consumo de Procesos Top CPU & RAM
     echo -e "${CYAN}📊 TOP PROCESOS DE MAYOR CONSUMO (RAM / CPU):${NC}"
-    ps -arcx -o %cpu,pmem,comm | head -n 6 | awk 'NR>1 {printf "   - %-25s CPU: %5s%% | RAM: %5s%%\n", $3, $1, $2}'
+    ps -arcx -o %cpu,pmem,comm | head -n 6 | awk 'NR>1 {comm=""; for(i=3;i<=NF;i++) comm=comm (i==3?"":" ") $i; printf "   - %-28s CPU: %5s%% | RAM: %5s%%\n", comm, $1, $2}'
     echo ""
 
     echo -e "${GREEN}======================================================${NC}"
@@ -661,7 +667,7 @@ check_for_updates() {
 sleep 2
 rm -rf "$APP_PATH"
 mv "$TMP_DIR/$APP_NAME" "$APP_PATH"
-open "$APP_PATH"
+sudo -u "$REAL_USER" open "$APP_PATH"
 rm -rf "$TMP_DIR"
 EOF
                     chmod +x "$UPDATER_SCRIPT"
@@ -731,8 +737,11 @@ show_gui_menu() {
         end tell' 2>/dev/null)
 
     if [ -z "$choice" ] || [ "$choice" == "false" ]; then
-        echo -e "${BLUE}Operación cancelada desde diálogo gráfico. Saliendo...${NC}"
-        exit 0
+        echo -e "${BLUE}Operación cancelada desde diálogo gráfico.${NC}"
+        if [ "$GUI_MODE" = true ]; then
+            exit 0
+        fi
+        return
     fi
 
     case "$choice" in
