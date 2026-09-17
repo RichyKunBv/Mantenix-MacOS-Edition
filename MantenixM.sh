@@ -26,7 +26,7 @@ fi
 
 # --- Directorio y Archivo de Log ---
 LOG_DIR="$REAL_HOME/Library/Logs/Mantenix"
-LOG_FILE="$LOG_DIR/MantenixBETA.log"
+LOG_FILE="$LOG_DIR/Mantenix.log"
 mkdir -p "$LOG_DIR" 2>/dev/null
 
 # --- Colores y Estilos ---
@@ -768,7 +768,7 @@ show_menu() {
     echo -e "${GREEN}======================================================${NC}"
     echo -e "${GREEN}           MANTENIX FOR MACOS v${CURRENT_VERSION} (Big Sur+)   ${NC}"
     echo -e "${GREEN}======================================================${NC}"
-    echo -e "${BLUE}  Usuario real: ${REAL_USER} | Log: ~/Library/Logs/MantenixBETA.log${NC}"
+    echo -e "${BLUE}  Usuario real: ${REAL_USER} | Log: ~/Library/Logs/Mantenix.log${NC}"
     echo ""
     echo -e "   ${YELLOW}1)${NC} Limpieza General de Cachés"
     echo -e "   ${YELLOW}2)${NC} Verificación del Disco APFS"

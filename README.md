@@ -1,142 +1,148 @@
-# 🚀 Mantenix: El Asistente de Mantenimiento Definitivo para MacOS
+# Mantenix v4.0 — Mantenimiento inteligente para macOS
+
+Mantenix es una utilidad de mantenimiento y limpieza para macOS diseñada para ayudarte a optimizar el sistema, limpiar cachés, revisar seguridad, mantener Homebrew actualizado y conservar el rendimiento del Mac sin entrar en juegos complejos ni configuraciones avanzadas.
+
+La versión 4.0 llega con una experiencia más moderna, más segura y enfocada en los sistemas actuales de macOS, con compatibilidad para macOS Big Sur 11.0 o superior.
 
 ---
 
-## Mantenimiento para macOS
+## ¿Qué es Mantenix?
 
-Este script proporciona un **menú interactivo** que te permite realizar diversas tareas de mantenimiento en macOS. Incluye funciones para la **limpieza del sistema**, el **mantenimiento de componentes clave** y la **actualización de Homebrew**. Está diseñado para ser fácil de usar y es compatible con varias versiones de macOS.
+Mantenix es un script Bash pensado para usuarios que quieren un mantenimiento rápido, seguro y visual de su Mac desde Terminal. Te permite:
 
----
-
-## Uso
-
-Para empezar a usar el script, primero dale permisos de ejecución. Abre la Terminal y ejecuta el siguiente comando (recuerda cambiar `(tu_usuario)` por tu nombre de usuario y ajusta la ruta si el script no está en tu Escritorio):
-
-```sh
-chmod +x /Users/(tu_usuario)/Desktop/MantenixM.sh
-```
-
-Una vez que tenga los permisos, puedes ejecutar el script. Abre la Terminal y usa este comando:
-
-```sh
-sudo /Users/(tu_usuario)/Desktop/MantenixM.sh
-```
-
-**Consejo rápido:** Para ejecutar el script de forma más sencilla, escribe `sudo ` (con el espacio al final) en la Terminal, luego simplemente **arrastra el archivo `MantenixM.sh` desde el Finder a la ventana de la Terminal** y presiona `Enter`.
-
-
-Ejemplo:
-![Captura de Pantalla 2025-06-07 a la(s) 11 17 32 p m](https://github.com/user-attachments/assets/6048be04-e1fa-41cb-af15-709319994834)
-
----
-
-## Funciones del Script (v3.1)
-
-La versión 3.1 del script ofrece un menú organizado con las siguientes opciones:
-
-
-<img width="682" height="574" alt="Captura de pantalla 2026-08-09 a la(s) 2 50 06 p m" src="https://github.com/user-attachments/assets/5ce773d9-99a5-44f5-bf1e-d68489619cfb" />
-
-
-### 1. Limpieza General¹
-Esta opción ejecuta varias tareas para **liberar espacio y optimizar el rendimiento**:
-* **Limpieza de cachés de sistema, usuario, logs** y estados de aplicaciones guardados.
-* **Eliminación de metadatos y cachés de iconos y Spotlight**.
-* **Limpieza de archivos de intercambio (Swap)** (te pedirá confirmación antes de proceder).
-
-### 2. Mantenimiento del Sistema
-Aquí encontrarás funciones esenciales para el **buen funcionamiento de los componentes centrales** de tu macOS:
-* **Verificación y reparación del disco principal** (compatible con sistemas de archivos APFS y HFS+).
-* **Reparación de permisos del sistema²** (solo relevante para macOS Mojave 10.14 y versiones anteriores).
-* **Restablecimiento de configuraciones de red** (limpia DNS, ajusta IPv6 y reinicia la interfaz de red).
-* **Liberación de memoria RAM**.
-* **Detención temporal de procesos de indexación** (`mds`, `mdworker`, `corespotlightd`) para mejorar la respuesta del sistema.
-
-### 3. Actualizar Homebrew³
-Esta opción te permite **mantener Homebrew y tus paquetes actualizados**:
-* Detecta si Homebrew está instalado en tu sistema.
-* Si lo tienes, **actualiza Homebrew y todos los paquetes instalados** a través de él, además de limpiar archivos antiguos.
-* Si Homebrew no está presente, te informará y te indicará dónde encontrarlo para instalarlo.
-    * **Nota Importante:** Esta tarea se ejecuta con los permisos del **usuario que inició el script** (no con `sudo`), lo cual es crucial para evitar problemas de permisos con tu instalación de Homebrew.
-
-### 4. Ejecutar todo
-* **A. Ejecutar TODO el Mantenimiento:** Realiza de forma consecutiva todas las tareas incluidas en "Limpieza General", "Mantenimiento del Sistema" y "Actualizar Homebrew".
-
-### 5. Reporte de salud del Mac
-Esta opcion te da informacion sobre tu sistema como el estado de la bateria, espacio usado, tu procesador y cuanta ram tienes
-
-<img width="385" height="237" alt="Captura de pantalla 2025-07-11 a la(s) 9 49 55 p m" src="https://github.com/user-attachments/assets/b30daebd-8352-42fa-9f8d-2c43ff8d4bc2" />
-
-### 6. Limpiar cache de Xcode
-* **B.** Esta opcion limpia el cache de Xcode ya que puede llegar a pesar GB
-
-### 7. Desinstalar Visual Studio for Mac y Xamarin
-* **C.** Esta opción desinstala completamente Visual Studio for Mac junto con todos sus componentes de Xamarin y archivos residuales del sistema.
-
-### Opciones Adicionales del Menú:
-* **Y. El script se autoactualiza con solo un simple click solo le tienes que picar una vez para que se actualice y reinicie en la ultima version disponible⁵.
-
-![Captura de Pantalla 2025-06-27 a la(s) 12 14 25 a m](https://github.com/user-attachments/assets/94fe0b92-ec5a-4834-860a-d373a9a2e06d)
-
-### Revision de seguridad⁴
-* **6 Esta opcion verifica si estan activos los metodos de seguridad integrados en el sistema como Firewall y Gatekeeper
-<img width="561" height="181" alt="Captura de pantalla 2025-09-12 a la(s) 6 45 42 p m" src="https://github.com/user-attachments/assets/b08359e2-c0f2-4a72-8fda-8b228abad058" />
-
-
-### Limpieza de cache de aplicaciones
-* **7 Limpia el cache de aplicaciones comunes
- <img width="386" height="59" alt="Captura de pantalla 2025-09-12 a la(s) 6 47 31 p m" src="https://github.com/user-attachments/assets/3451f0dd-05ef-48f8-9ab3-e3eb99070e39" />
- 
+- limpiar cachés del sistema y del usuario
+- liberar memoria y reducir el consumo innecesario
+- revisar el estado del disco y del sistema
+- restaurar configuración de red
+- actualizar Homebrew de forma segura
+- revisar seguridad del sistema
+- crear instantáneas locales de Time Machine antes de cambios importantes
+- buscar actualizaciones de la propia app desde GitHub
 
 ---
 
 ## Compatibilidad
 
-Este script ha sido diseñado para ser compatible con **macOS High Sierra (10.13)** y versiones posteriores, incluyendo las más recientes como **Sequoia (15.0)**.
+- macOS Big Sur 11.0 o superior
+- Soporte recomendado para macOS Sequoia y versiones recientes
+- Requiere permisos de administrador para ciertas funciones del sistema
+
+> La versión 4.0 está enfocada en equipos modernos con macOS 11+ y elimina compatibilidad con sistemas antiguos para reforzar la seguridad y la fiabilidad del mantenimiento.
 
 ---
 
-## Notas Importantes
+## Instalación
 
-* Es **obligatorio ejecutar el script con permisos de administrador (`sudo`)** para que la mayoría de sus funciones puedan operar correctamente.
-* Algunas funciones, como la **reparación de permisos**, solo son útiles y están disponibles en versiones de macOS más antiguas (Mojave y anteriores).
-* Para una **reparación más profunda del sistema de archivos**, te recomiendo reiniciar tu Mac en **modo de recuperación** (manteniendo `Command + R` al encender) y luego ejecutar el siguiente comando en la Terminal de recuperación:
-    ```sh
-    /sbin/fsck -fy
-    ```
+1. Descarga el repositorio o copia el archivo `MantenixM.sh` a tu equipo.
+2. Abre la Terminal.
+3. Ejecuta:
 
----
+```bash
+chmod +x MantenixM.sh
+sudo ./MantenixM.sh
+```
 
-<details>
-<summary>NOTAS</summary>
-   
-1. La limpieza de cachés es una operación segura que elimina archivos temporales. Tras la limpieza, es posible que algunas aplicaciones tarden un poco más en abrirse por primera vez mientras regeneran dichos archivos.
+También puedes usar la ayuda del script para ver todas las opciones disponibles:
 
-2. El comando para reparar permisos fue descontinuado por Apple a partir de macOS Catalina (10.15), ya que el volumen del sistema se convirtió en uno de solo lectura, protegiendo la integridad de los permisos de forma automática.
-
-3. La actualización de Homebrew se ejecuta intencionadamente con los permisos del usuario estándar (${SUDO_USER}), no como root. Esta es la práctica recomendada por Homebrew para mantener la integridad de la instalación y evitar problemas de permisos.
-
-4. Gatekeeper es una tecnología de seguridad que verifica que las apps que instalas provengan de desarrolladores identificados por Apple. El Firewall bloquea conexiones de red no deseadas. Se recomienda mantener ambos activados.
-
-5. La función de auto-actualización requiere una conexión a internet activa para poder verificar y descargar la versión más reciente del script desde el repositorio oficial en GitHub.
-
-</details>
-
+```bash
+./MantenixM.sh --help
+```
 
 ---
 
-<details>
-<summary>TESTS</summary>
+## Menú principal
 
-## Entornos de Prueba
+La versión 4.0 incluye un menú claro y ordenado con estas opciones:
 
-Este proyecto ha sido probado y verificado en las siguientes configuraciones de hardware y software:
+- 1) Limpieza General de Cachés
+- 2) Verificación del Disco APFS
+- 3) Restablecer Configuración de Red
+- 4) Liberar Memoria RAM Inactiva
+- 5) Actualizar y Optimizar Homebrew
+- 6) Reporte de Salud del Mac
+- 7) Revisión de Seguridad
+- 8) Limpieza de Caché de Apps
+- 9) Purgar Snapshots Locales (Time Machine)
+- A) Ejecutar Todo el Mantenimiento
+- B) Limpieza de Caché de Xcode
+- C) Desinstalar Visual Studio for Mac
+- S) Crear Instantánea de Seguridad Time Machine
+- Y) Buscar Actualizaciones
+- X) Salir
 
-| Sistema Operativo | Arquitectura / CPU | Memoria RAM | Notas |
-| :--- | :--- | :--- | :--- |
-| macOS 27 | ARM / M1 | 16 GB | Beta macOS 27 |
-| macOS 10.13.6 | x86_64 / i7-2760QM | 10 GB | Verificacion de compatibilidad con macOS viejo |
-| macOS 15.7.7 | x86_64 / i5 (2 Puertos Thunderbolt) | 8 GB |  |
-| macos 26.5.1 | ARM / A18 Pro | 8 GB |  |
+---
 
-</details>
+## Nuevas funciones en v4.0
+
+### Seguridad y prevención
+
+- Comprobación explícita de compatibilidad con macOS Big Sur+
+- Creación de instantáneas locales de Time Machine antes de limpiar o modificar el sistema
+- Avisos y registro en `~/Library/Logs/Mantenix/MantenixBETA.log`
+- Revisión de seguridad del sistema con detección de Firewall, Gatekeeper y otros elementos relevantes
+
+### Mantenimiento más completo
+
+- Limpieza de cachés del usuario, sistema y temporales
+- Reindexación de Spotlight
+- Limpieza de swap y archivos temporales
+- Limpieza de cachés de Xcode y aplicaciones populares
+- Optimización y actualización de Homebrew con ejecución segura para el usuario real
+
+### Actualizaciones inteligentes
+
+- Comprueba automáticamente si existe actualización del proyecto
+- Descarga e instala la última versión del script cuando está disponible
+- Reinicia el script con la versión más reciente
+
+---
+
+## Capturas del proyecto
+
+<img src="/screenshots/readme/menu.png">
+
+<img src="/screenshots/readme/salud.png">
+
+<img src="/screenshots/readme/seguridad.png">
+
+<img src="/screenshots/readme/actualizar.png">
+
+<img src="/screenshots/readme/brew.png">
+
+---
+
+## Uso recomendado
+
+Para usuarios normales, la mejor opción es:
+
+1. abrir el script
+2. elegir la opción A para ejecutar todo el mantenimiento
+3. confirmar la instantánea de seguridad
+4. revisar el reporte de salud y seguridad
+5. dejar que el script actualice Homebrew y limpie archivos temporales
+
+Esto te da una experiencia de mantenimiento más segura y ordenada en un solo flujo.
+
+---
+
+## Nota importante
+
+Ejecuta Mantenix con precaución en equipos con configuraciones custom o entornos de trabajo sensibles. Algunas tareas eliminan cachés, temporales y archivos de sistema que pueden requerir reinicio o regeneración de datos por parte de aplicaciones.
+
+---
+
+## Licencia
+
+Este proyecto se distribuye bajo la licencia indicada en el repositorio.
+
+---
+
+## Estado del proyecto
+
+La versión 4.0 está diseñada como una evolución más moderna del mantenimiento de macOS, con una base más clara para la experiencia de beta y la preparación de futuras releases.
+
+---
+
+## Créditos
+
+Desarrollado para la comunidad de usuarios de macOS que buscan un mantenimiento simple, rápido y capaz de ayudar a mantener el sistema limpio y estable.
